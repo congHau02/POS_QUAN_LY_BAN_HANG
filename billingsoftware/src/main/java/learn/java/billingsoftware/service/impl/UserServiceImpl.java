@@ -26,6 +26,10 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public UserResponse createUser(UserRequest request) {
+        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : null;
+        if (email != null && userRepository.existsByEmail(email)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email đã tồn tại: " + email);
+        }
         UserEntity newUser = convertToEntity(request);
         newUser = userRepository.save(newUser);
         activityLogService.logActivity("CREATE", "USER", newUser.getUserId(), "Created user: " + newUser.getEmail() + " (" + newUser.getRole() + ")");
@@ -46,7 +50,7 @@ public class UserServiceImpl implements UserService {
     private UserEntity convertToEntity(UserRequest request) {
         return UserEntity.builder()
                 .userId(UUID.randomUUID().toString())
-                .email(request.getEmail())
+                .email(request.getEmail() != null ? request.getEmail().trim().toLowerCase() : null)
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(request.getRole().toUpperCase())
                 .name(request.getName())
@@ -55,15 +59,15 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public String getUserRole(String email) {
-       UserEntity existingUser =userRepository.findByEmail(email)
-               .orElseThrow(()-> new UsernameNotFoundException("User not found for the email: "+ email));
+       UserEntity existingUser = userRepository.findByEmail(email != null ? email.trim().toLowerCase() : null)
+               .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found for the email: " + email));
        return existingUser.getRole();
     }
 
     @Override
     public UserResponse findByEmail(String email) {
-        UserEntity existingUser = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found for the email: " + email));
+        UserEntity existingUser = userRepository.findByEmail(email != null ? email.trim().toLowerCase() : null)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found for the email: " + email));
         return convertToResponse(existingUser);
     }
 
@@ -77,8 +81,8 @@ public class UserServiceImpl implements UserService {
 
     @Override
     public void deleteUser(String id) {
-        UserEntity existingUser= userRepository.findByUserId(id)
-                .orElseThrow(()-> new UsernameNotFoundException("User not found"));
+        UserEntity existingUser = userRepository.findByUserId(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with id: " + id));
         userRepository.delete(existingUser);
         activityLogService.logActivity("DELETE", "USER", existingUser.getUserId(), "Deleted user: " + existingUser.getEmail());
     }

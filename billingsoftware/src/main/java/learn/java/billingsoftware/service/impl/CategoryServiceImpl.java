@@ -61,7 +61,7 @@ public class CategoryServiceImpl implements CategoryService {
     @Override
     public void delete(String categoryId) {
         CategoryEntity existingCategory = categoryRepository.findByCategoryId(categoryId)
-                .orElseThrow(()->new RuntimeException("Category not found: "+ categoryId));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found: " + categoryId));
         boolean isFileDelete = true;
         if (existingCategory.getImgUrl() != null && !existingCategory.getImgUrl().trim().isEmpty()) {
             isFileDelete = fileUploadService.deleteFile(existingCategory.getImgUrl());

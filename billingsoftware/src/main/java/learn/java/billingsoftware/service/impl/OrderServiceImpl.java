@@ -342,7 +342,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     public OrderResponse getOrderById(String orderId) {
         OrderEntity existingOrder = orderEntityRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new RuntimeException("Order Not Found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng #" + orderId));
         return convertToResponse(existingOrder);
     }
 
