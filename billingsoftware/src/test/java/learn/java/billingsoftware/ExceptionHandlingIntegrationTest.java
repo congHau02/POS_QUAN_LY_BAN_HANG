@@ -87,6 +87,13 @@ public class ExceptionHandlingIntegrationTest {
     }
 
     @Test
+    void testDeleteNonExistentItemReturnsNotFound() throws Exception {
+        mockMvc.perform(delete("/admin/items/non-existent-item-id")
+                        .with(user("admin").roles("ADMIN")))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void testFindByEmailNonExistentThrowsResponseStatusExceptionNotFound() {
         ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> {
             userService.findByEmail("non-existent-" + UUID.randomUUID() + "@example.com");

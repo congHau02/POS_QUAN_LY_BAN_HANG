@@ -72,10 +72,6 @@ public class ItemController {
     @DeleteMapping("/admin/items/{itemId}")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void removeItem(@PathVariable("itemId") String itemId) {
-        try {
-            itemService.deleteItem(itemId);
-        } catch (Exception e) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, e.getMessage());
-        }
+        itemService.deleteItem(itemId);
     }
 }

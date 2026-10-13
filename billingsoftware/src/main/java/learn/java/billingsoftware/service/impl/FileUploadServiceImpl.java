@@ -46,10 +46,10 @@ public class FileUploadServiceImpl implements FileUploadService {
             if (response.sdkHttpResponse().isSuccessful()) {
                 return "https://" + bucketName + ".s3.amazonaws.com/" + key;
             } else {
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "An error while upload IMG");
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Tải lên tệp S3 thất bại");
             }
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "An error while upload IMG");
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi đọc dữ liệu tệp tải lên: " + e.getMessage());
         }
     }
 

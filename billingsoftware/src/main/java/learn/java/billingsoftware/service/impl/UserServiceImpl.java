@@ -28,7 +28,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional
     public UserResponse createUser(UserRequest request) {
-        String email = request.getEmail() != null ? request.getEmail().trim().toLowerCase() : null;
+        String email = normalizeEmail(request.getEmail());
         if (email != null && userRepository.existsByEmail(email)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Email đã tồn tại: " + email);
         }
@@ -52,7 +52,7 @@ public class UserServiceImpl implements UserService {
     private UserEntity convertToEntity(UserRequest request) {
         return UserEntity.builder()
                 .userId(UUID.randomUUID().toString())
-                .email(request.getEmail() != null ? request.getEmail().trim().toLowerCase() : null)
+                .email(normalizeEmail(request.getEmail()))
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(request.getRole().toUpperCase())
                 .name(request.getName())
@@ -62,7 +62,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public String getUserRole(String email) {
-       UserEntity existingUser = userRepository.findByEmail(email != null ? email.trim().toLowerCase() : null)
+       UserEntity existingUser = userRepository.findByEmail(normalizeEmail(email))
                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found for the email: " + email));
        return existingUser.getRole();
     }
@@ -70,7 +70,7 @@ public class UserServiceImpl implements UserService {
     @Override
     @Transactional(readOnly = true)
     public UserResponse findByEmail(String email) {
-        UserEntity existingUser = userRepository.findByEmail(email != null ? email.trim().toLowerCase() : null)
+        UserEntity existingUser = userRepository.findByEmail(normalizeEmail(email))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found for the email: " + email));
         return convertToResponse(existingUser);
     }
@@ -100,7 +100,7 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with id: " + userId));
 
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
-            String newEmail = request.getEmail().trim().toLowerCase();
+            String newEmail = normalizeEmail(request.getEmail());
             if (!newEmail.equalsIgnoreCase(existingUser.getEmail())) {
                 var otherUser = userRepository.findByEmail(newEmail);
                 if (otherUser.isPresent() && !otherUser.get().getUserId().equals(existingUser.getUserId())) {
@@ -129,5 +129,9 @@ public class UserServiceImpl implements UserService {
         existingUser = userRepository.save(existingUser);
         activityLogService.logActivity("UPDATE", "USER", existingUser.getUserId(), "Updated user: " + existingUser.getEmail() + " (" + existingUser.getRole() + ")");
         return convertToResponse(existingUser);
+    }
+
+    private String normalizeEmail(String email) {
+        return email != null ? email.trim().toLowerCase() : null;
     }
 }

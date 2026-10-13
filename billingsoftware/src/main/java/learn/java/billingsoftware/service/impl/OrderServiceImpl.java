@@ -46,6 +46,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
+    private static final long PAYOS_TEST_ORDER_CODE = 123L;
+
     private final OrderEntityRepository orderEntityRepository;
     private final PayOS payOS;
     private final VariantRepository variantRepository;
@@ -520,8 +522,8 @@ public class OrderServiceImpl implements OrderService {
         }
 
         Long orderCode = data.getOrderCode();
-        if (orderCode == 123L) {
-            log.info("PayOS Webhook test ping acknowledged (orderCode=123)");
+        if (orderCode == PAYOS_TEST_ORDER_CODE) {
+            log.info("PayOS Webhook test ping acknowledged (orderCode={})", PAYOS_TEST_ORDER_CODE);
             return;
         }
 
