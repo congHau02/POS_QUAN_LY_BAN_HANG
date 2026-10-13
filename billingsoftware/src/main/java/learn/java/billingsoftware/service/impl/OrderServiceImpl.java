@@ -12,6 +12,7 @@ import learn.java.billingsoftware.service.ActivityLogService;
 import learn.java.billingsoftware.service.OrderService;
 import learn.java.billingsoftware.service.PromotionService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,7 @@ import vn.payos.exception.PayOSException;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkRequest;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse;
 import vn.payos.model.v2.paymentRequests.PaymentLinkItem;
+import vn.payos.model.webhooks.WebhookData;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -39,6 +41,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
@@ -494,5 +497,37 @@ public class OrderServiceImpl implements OrderService {
                 System.err.println("Warning: Không thể hủy link PayOS cho đơn #" + order.getId() + ": " + e.getMessage());
             }
         }
+    }
+
+    @Override
+    @Transactional
+    public void handlePaymentWebhook(WebhookData data) {
+        if (data == null || data.getOrderCode() == null) {
+            return;
+        }
+
+        Long orderCode = data.getOrderCode();
+        if (orderCode == 123L) {
+            log.info("PayOS Webhook test ping acknowledged (orderCode=123)");
+            return;
+        }
+
+        OrderEntity order = orderEntityRepository.findById(orderCode)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng với orderCode: " + orderCode));
+
+        PaymentDetails paymentDetails = order.getPaymentDetails();
+        if (paymentDetails != null && paymentDetails.getStatus() == PaymentDetails.PaymentStatus.COMPLETED) {
+            log.info("Order #{} is already COMPLETED. Ignoring redundant webhook delivery.", order.getOrderId());
+            return;
+        }
+
+        if (paymentDetails == null) {
+            paymentDetails = new PaymentDetails();
+            order.setPaymentDetails(paymentDetails);
+        }
+        paymentDetails.setStatus(PaymentDetails.PaymentStatus.COMPLETED);
+
+        orderEntityRepository.save(order);
+        activityLogService.logActivity("PayOS-Webhook", "UPDATE", "ORDER", order.getOrderId(), "Payment confirmed via PayOS Webhook for order #" + order.getOrderId());
     }
 }
