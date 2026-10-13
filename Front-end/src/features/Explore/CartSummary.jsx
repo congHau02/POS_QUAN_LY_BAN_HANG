@@ -1,9 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCreateOrder } from "../Orders/useCreateOrder";
 import PaymentQRCode from "../Payment/PaymentQRCode";
-import ReceiptPopup from "./ReceiptPopup";
 import toast from "react-hot-toast";
+
+const ReceiptPopup = lazy(() => import("./ReceiptPopup"));
+const preloadReceiptPopup = () => import("./ReceiptPopup");
 import { formatCurrency } from "../../utils/formatCurrency";
 import { evaluatePromotion } from "../../services/PromotionService";
 import {
@@ -49,6 +51,7 @@ function CartSummary({
   // Clear applied coupon if query evaluation produced an error
   useEffect(() => {
     if (promoError && appliedCoupon) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setAppliedCoupon("");
     }
   }, [promoError, appliedCoupon]);
@@ -240,6 +243,7 @@ function CartSummary({
         <button
           type="button"
           onClick={() => onCreateOrder("CASH")}
+          onMouseEnter={preloadReceiptPopup}
           disabled={isCreating || !cartItems.length}
           className="inline-flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors disabled:opacity-40 cursor-pointer"
         >
@@ -269,14 +273,16 @@ function CartSummary({
 
       {/* Cash Order Receipt Modal */}
       {completedCashOrder && (
-        <ReceiptPopup
-          order={completedCashOrder}
-          isOpen={Boolean(completedCashOrder)}
-          onClose={() => {
-            setCompletedCashOrder(null);
-            handleClearCart();
-          }}
-        />
+        <Suspense fallback={null}>
+          <ReceiptPopup
+            order={completedCashOrder}
+            isOpen={Boolean(completedCashOrder)}
+            onClose={() => {
+              setCompletedCashOrder(null);
+              handleClearCart();
+            }}
+          />
+        </Suspense>
       )}
 
       {/* Modal PayOS */}
