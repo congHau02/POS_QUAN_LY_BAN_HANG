@@ -3,16 +3,22 @@ import { useEffect, useRef } from "react";
 export function useOutsideClick(handler, listenCapturing = true, refs = null) {
   const defaultRef = useRef();
   const handlerRef = useRef(handler);
+  const refsRef = useRef(refs);
 
   useEffect(() => {
     handlerRef.current = handler;
   });
 
+  useEffect(() => {
+    refsRef.current = refs;
+  });
+
   useEffect(
     function () {
       function handleClick(e) {
-        if (refs) {
-          const refList = Array.isArray(refs) ? refs : [refs];
+        const currentRefs = refsRef.current;
+        if (currentRefs) {
+          const refList = Array.isArray(currentRefs) ? currentRefs : [currentRefs];
           const isInside = refList.some(
             (r) => r?.current && r.current.contains(e.target)
           );
@@ -33,7 +39,7 @@ export function useOutsideClick(handler, listenCapturing = true, refs = null) {
       return () =>
         document.removeEventListener("click", handleClick, listenCapturing);
     },
-    [listenCapturing, refs]
+    [listenCapturing]
   );
 
   return defaultRef;

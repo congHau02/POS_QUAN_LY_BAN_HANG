@@ -39,13 +39,13 @@ function Menubar() {
 
   // Single unified listener for outside clicks across all menus
   useOutsideClick((e) => {
-    if (manageRef.current && !manageRef.current.contains(e.target)) {
+    if (isManageOpen && manageRef.current && !manageRef.current.contains(e.target)) {
       setIsManageOpen(false);
     }
-    if (profileRef.current && !profileRef.current.contains(e.target)) {
+    if (isProfileOpen && profileRef.current && !profileRef.current.contains(e.target)) {
       setIsProfileOpen(false);
     }
-    if (navRef.current && !navRef.current.contains(e.target)) {
+    if (isMobileMenuOpen && navRef.current && !navRef.current.contains(e.target)) {
       setIsMobileMenuOpen(false);
     }
   });
