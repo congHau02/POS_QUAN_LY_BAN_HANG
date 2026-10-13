@@ -54,7 +54,7 @@ public class OrderServiceImpl implements OrderService {
     private final PromotionRepository promotionRepository;
     private final CustomerRepository customerRepository;
     private final ActivityLogService activityLogService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
 
     @Value("${payos.return-url:http://localhost:5173/payment/success}")
     private String payosReturnUrl;
@@ -507,7 +507,7 @@ public class OrderServiceImpl implements OrderService {
             try {
                 payOS.paymentRequests().cancel(order.getId(), reason);
             } catch (Exception e) {
-                System.err.println("Warning: Không thể hủy link PayOS cho đơn #" + order.getId() + ": " + e.getMessage());
+                log.warn("Không thể hủy link PayOS cho đơn #{}: {}", order.getId(), e.getMessage());
             }
         }
     }

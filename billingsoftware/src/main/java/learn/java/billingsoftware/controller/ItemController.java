@@ -18,12 +18,12 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ItemController {
     private final ItemService itemService;
+    private final ObjectMapper objectMapper;
 
     @PostMapping("/admin/items")
     @ResponseStatus(HttpStatus.CREATED)
     public ItemResponse addItem(@RequestPart("item") String itemString,
                                 @RequestPart(value = "file", required = false) MultipartFile file) {
-        ObjectMapper objectMapper = new ObjectMapper();
         ItemRequest itemRequest = null;
         try {
             itemRequest = objectMapper.readValue(itemString, ItemRequest.class);
@@ -39,7 +39,6 @@ public class ItemController {
     public ItemResponse updateItemMultipart(@PathVariable("itemId") String itemId,
                                             @RequestPart("item") String itemString,
                                             @RequestPart(value = "file", required = false) MultipartFile file) {
-        ObjectMapper objectMapper = new ObjectMapper();
         try {
             ItemRequest itemRequest = objectMapper.readValue(itemString, ItemRequest.class);
             return itemService.updateItem(itemId, itemRequest, file);

@@ -20,12 +20,12 @@ import java.util.List;
 public class CategoryController {
 
     private final CategoryService categoryService;
+    private final ObjectMapper objectMapper;
 
     @PostMapping("/admin/categories")
     @ResponseStatus(HttpStatus.CREATED)
     public CategoryResponse addCategory(@RequestPart("category") String categoryString,
                                         @RequestPart("file")MultipartFile file) {
-        ObjectMapper objectMapper = new ObjectMapper();
         CategoryRequest request = null;
         try {
             request = objectMapper.readValue(categoryString, CategoryRequest.class);
@@ -39,7 +39,6 @@ public class CategoryController {
     public CategoryResponse updateCategoryMultipart(@PathVariable String categoryId,
                                                     @RequestPart("category") String categoryString,
                                                     @RequestPart(value = "file", required = false) MultipartFile file) {
-        ObjectMapper objectMapper = new ObjectMapper();
         try {
             CategoryRequest request = objectMapper.readValue(categoryString, CategoryRequest.class);
             return categoryService.update(categoryId, request, file);
