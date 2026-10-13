@@ -32,6 +32,7 @@ import learn.java.billingsoftware.entity.TransactionType;
 import learn.java.billingsoftware.entity.VariantEntity;
 import learn.java.billingsoftware.repository.InventoryTransactionRepository;
 import learn.java.billingsoftware.repository.VariantRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -54,6 +55,12 @@ public class OrderServiceImpl implements OrderService {
     private final CustomerRepository customerRepository;
     private final ActivityLogService activityLogService;
     private final ObjectMapper objectMapper = new ObjectMapper();
+
+    @Value("${payos.return-url:http://localhost:5173/payment/success}")
+    private String payosReturnUrl;
+
+    @Value("${payos.cancel-url:http://localhost:5173/payment/cancel}")
+    private String payosCancelUrl;
 
     @Override
     @Transactional
@@ -196,8 +203,8 @@ public class OrderServiceImpl implements OrderService {
                         .orderCode(orderCode)
                         .amount(newOrder.getGrandTotal().longValue())
                         .description("Thanh toan don " + orderCode)
-                        .returnUrl("http://localhost:5173/payment/success")
-                        .cancelUrl("http://localhost:5173/payment/cancel")
+                        .returnUrl(payosReturnUrl)
+                        .cancelUrl(payosCancelUrl)
                         .items(payOSItems)
                         .build();
 
