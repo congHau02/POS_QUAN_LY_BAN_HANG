@@ -152,6 +152,7 @@ public class ModifierGroupServiceImpl implements ModifierGroupService {
             item.setModifierGroups(groups);
         }
         itemRepository.save(item);
+        activityLogService.logActivity("UPDATE", "MODIFIER_GROUP", itemId, "Attached modifier groups to item " + itemId);
     }
 
     @Override

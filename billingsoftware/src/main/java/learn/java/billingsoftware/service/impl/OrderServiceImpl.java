@@ -332,6 +332,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<OrderResponse> getLatestOrders() {
         return orderEntityRepository.findAllByOrderByCreatedAtDesc() 
                 .stream() 
@@ -340,6 +341,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public OrderResponse getOrderById(String orderId) {
         OrderEntity existingOrder = orderEntityRepository.findByOrderId(orderId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng #" + orderId));
@@ -347,16 +349,19 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Double sumSalesByDate(LocalDate date) {
         return orderEntityRepository.sumSalesByDate(date);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Long countByOrderDate(LocalDate date) {
         return orderEntityRepository.countByOrderDate(date);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<OrderResponse> findRecentOrders(int limit) {
         Pageable pageable = PageRequest.of(0, limit);
         return orderEntityRepository.findRecentOrders(pageable)
@@ -366,6 +371,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public OrderPageResponse getOrdersPaginated(int page, int size, String search, String status) {
         PaymentDetails.PaymentStatus paymentStatus = null;
         if (status != null && !status.trim().isEmpty() && !status.equalsIgnoreCase("ALL")) {
