@@ -100,7 +100,7 @@ public class DashboardMetricIntegrationTest {
                         .build())
                 .createdAt(LocalDateTime.now())
                 .build();
-        orderEntityRepository.save(order);
+        orderEntityRepository.saveAndFlush(order);
 
         // 3. Re-query dashboard and assert that todayOrderCount incremented by 1 and todaySales increased
         String updatedContent = mockMvc.perform(get("/dashboard")
