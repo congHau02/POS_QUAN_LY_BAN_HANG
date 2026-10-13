@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import useLogout from "../features/Auth/useLogout";
 import { useCurrentUser } from "../hooks/useCurrentUser";
@@ -38,13 +38,11 @@ function Menubar() {
   const navRef = useOutsideClick(() => setIsMobileMenuOpen(false));
 
   // Auto-close dropdowns and mobile menu on route changes
-  const [prevPathname, setPrevPathname] = useState(location.pathname);
-  if (location.pathname !== prevPathname) {
-    setPrevPathname(location.pathname);
+  useEffect(() => {
     setIsManageOpen(false);
     setIsProfileOpen(false);
     setIsMobileMenuOpen(false);
-  }
+  }, [location.pathname]);
 
   return (
     <nav ref={navRef} className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">

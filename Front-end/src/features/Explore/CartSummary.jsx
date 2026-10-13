@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCreateOrder } from "../Orders/useCreateOrder";
 import PaymentQRCode from "../Payment/PaymentQRCode";
@@ -47,9 +47,11 @@ function CartSummary({
   const isEvaluating = isApplyingCoupon || isEvaluatingPromo;
 
   // Clear applied coupon if query evaluation produced an error
-  if (promoError && appliedCoupon) {
-    setAppliedCoupon("");
-  }
+  useEffect(() => {
+    if (promoError && appliedCoupon) {
+      setAppliedCoupon("");
+    }
+  }, [promoError, appliedCoupon]);
 
   const handleApplyCoupon = async () => {
     const code = couponInput.trim().toUpperCase();
