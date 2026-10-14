@@ -12,6 +12,7 @@ import learn.java.billingsoftware.service.ActivityLogService;
 import learn.java.billingsoftware.service.OrderService;
 import learn.java.billingsoftware.service.PromotionService;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
@@ -22,6 +23,7 @@ import vn.payos.exception.PayOSException;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkRequest;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse;
 import vn.payos.model.v2.paymentRequests.PaymentLinkItem;
+import vn.payos.model.webhooks.WebhookData;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -30,6 +32,7 @@ import learn.java.billingsoftware.entity.TransactionType;
 import learn.java.billingsoftware.entity.VariantEntity;
 import learn.java.billingsoftware.repository.InventoryTransactionRepository;
 import learn.java.billingsoftware.repository.VariantRepository;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
 import java.math.BigDecimal;
@@ -39,9 +42,12 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class OrderServiceImpl implements OrderService {
+    private static final long PAYOS_TEST_ORDER_CODE = 123L;
+
     private final OrderEntityRepository orderEntityRepository;
     private final PayOS payOS;
     private final VariantRepository variantRepository;
@@ -50,7 +56,13 @@ public class OrderServiceImpl implements OrderService {
     private final PromotionRepository promotionRepository;
     private final CustomerRepository customerRepository;
     private final ActivityLogService activityLogService;
-    private final ObjectMapper objectMapper = new ObjectMapper();
+    private final ObjectMapper objectMapper;
+
+    @Value("${payos.return-url:http://localhost:5173/payment/success}")
+    private String payosReturnUrl;
+
+    @Value("${payos.cancel-url:http://localhost:5173/payment/cancel}")
+    private String payosCancelUrl;
 
     @Override
     @Transactional
@@ -193,8 +205,8 @@ public class OrderServiceImpl implements OrderService {
                         .orderCode(orderCode)
                         .amount(newOrder.getGrandTotal().longValue())
                         .description("Thanh toan don " + orderCode)
-                        .returnUrl("http://localhost:5173/payment/success")
-                        .cancelUrl("http://localhost:5173/payment/cancel")
+                        .returnUrl(payosReturnUrl)
+                        .cancelUrl(payosCancelUrl)
                         .items(payOSItems)
                         .build();
 
@@ -322,6 +334,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<OrderResponse> getLatestOrders() {
         return orderEntityRepository.findAllByOrderByCreatedAtDesc() 
                 .stream() 
@@ -330,23 +343,27 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public OrderResponse getOrderById(String orderId) {
         OrderEntity existingOrder = orderEntityRepository.findByOrderId(orderId)
-                .orElseThrow(() -> new RuntimeException("Order Not Found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng #" + orderId));
         return convertToResponse(existingOrder);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Double sumSalesByDate(LocalDate date) {
         return orderEntityRepository.sumSalesByDate(date);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Long countByOrderDate(LocalDate date) {
         return orderEntityRepository.countByOrderDate(date);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<OrderResponse> findRecentOrders(int limit) {
         Pageable pageable = PageRequest.of(0, limit);
         return orderEntityRepository.findRecentOrders(pageable)
@@ -356,6 +373,7 @@ public class OrderServiceImpl implements OrderService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public OrderPageResponse getOrdersPaginated(int page, int size, String search, String status) {
         PaymentDetails.PaymentStatus paymentStatus = null;
         if (status != null && !status.trim().isEmpty() && !status.equalsIgnoreCase("ALL")) {
@@ -491,8 +509,40 @@ public class OrderServiceImpl implements OrderService {
             try {
                 payOS.paymentRequests().cancel(order.getId(), reason);
             } catch (Exception e) {
-                System.err.println("Warning: Không thể hủy link PayOS cho đơn #" + order.getId() + ": " + e.getMessage());
+                log.warn("Không thể hủy link PayOS cho đơn #{}: {}", order.getId(), e.getMessage());
             }
         }
+    }
+
+    @Override
+    @Transactional
+    public void handlePaymentWebhook(WebhookData data) {
+        if (data == null || data.getOrderCode() == null) {
+            return;
+        }
+
+        Long orderCode = data.getOrderCode();
+        if (orderCode == PAYOS_TEST_ORDER_CODE) {
+            log.info("PayOS Webhook test ping acknowledged (orderCode={})", PAYOS_TEST_ORDER_CODE);
+            return;
+        }
+
+        OrderEntity order = orderEntityRepository.findById(orderCode)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng với orderCode: " + orderCode));
+
+        PaymentDetails paymentDetails = order.getPaymentDetails();
+        if (paymentDetails != null && paymentDetails.getStatus() == PaymentDetails.PaymentStatus.COMPLETED) {
+            log.info("Order #{} is already COMPLETED. Ignoring redundant webhook delivery.", order.getOrderId());
+            return;
+        }
+
+        if (paymentDetails == null) {
+            paymentDetails = new PaymentDetails();
+            order.setPaymentDetails(paymentDetails);
+        }
+        paymentDetails.setStatus(PaymentDetails.PaymentStatus.COMPLETED);
+
+        orderEntityRepository.save(order);
+        activityLogService.logActivity("PayOS-Webhook", "UPDATE", "ORDER", order.getOrderId(), "Payment confirmed via PayOS Webhook for order #" + order.getOrderId());
     }
 }

@@ -3,6 +3,7 @@ package learn.java.billingsoftware.entity;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
+import org.hibernate.annotations.UpdateTimestamp;
 
 import java.sql.Timestamp;
 import java.util.ArrayList;
@@ -49,6 +50,6 @@ public class ModifierGroupEntity {
     @Column(updatable = false)
     private Timestamp createdAt;
 
-    @CreationTimestamp
+    @UpdateTimestamp
     private Timestamp updatedAt;
 }

@@ -20,4 +20,6 @@ public interface OrderService {
 
     OrderResponse cancelOrder(String orderId);
     OrderResponse switchToCash(String orderId);
+
+    void handlePaymentWebhook(vn.payos.model.webhooks.WebhookData data);
 }

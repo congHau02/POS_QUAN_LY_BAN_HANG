@@ -8,6 +8,7 @@ import learn.java.billingsoftware.io.InventoryTransactionResponse;
 import learn.java.billingsoftware.io.StockCheckRequest;
 import learn.java.billingsoftware.repository.InventoryTransactionRepository;
 import learn.java.billingsoftware.repository.VariantRepository;
+import learn.java.billingsoftware.service.ActivityLogService;
 import learn.java.billingsoftware.service.InventoryService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
@@ -25,6 +26,7 @@ public class InventoryServiceImpl implements InventoryService {
 
     private final InventoryTransactionRepository inventoryTransactionRepository;
     private final VariantRepository variantRepository;
+    private final ActivityLogService activityLogService;
 
     @Override
     @Transactional
@@ -70,6 +72,8 @@ public class InventoryServiceImpl implements InventoryService {
         variant.setCachedStockQuantity(calculatedStock != null ? calculatedStock : 0);
         variantRepository.save(variant);
 
+        activityLogService.logActivity("CREATE", "INVENTORY", transaction.getTransactionId(), "Recorded inventory transaction " + transaction.getTransactionType() + " for variant " + variant.getSku());
+
         return convertToResponse(savedTx, variant.getCachedStockQuantity());
     }
 
@@ -114,6 +118,8 @@ public class InventoryServiceImpl implements InventoryService {
         Integer calculatedStock = inventoryTransactionRepository.calculateStockByVariantId(variant.getVariantId());
         variant.setCachedStockQuantity(calculatedStock != null ? calculatedStock : request.getActualCount());
         variantRepository.save(variant);
+
+        activityLogService.logActivity("UPDATE", "INVENTORY", transaction.getTransactionId(), "Performed stock check for variant " + variant.getSku() + " (Actual: " + request.getActualCount() + ")");
 
         return convertToResponse(savedTx, variant.getCachedStockQuantity());
     }

@@ -11,6 +11,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
@@ -25,7 +26,12 @@ public class UserServiceImpl implements UserService {
     private final ActivityLogService activityLogService;
 
     @Override
+    @Transactional
     public UserResponse createUser(UserRequest request) {
+        String email = normalizeEmail(request.getEmail());
+        if (email != null && userRepository.existsByEmail(email)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email đã tồn tại: " + email);
+        }
         UserEntity newUser = convertToEntity(request);
         newUser = userRepository.save(newUser);
         activityLogService.logActivity("CREATE", "USER", newUser.getUserId(), "Created user: " + newUser.getEmail() + " (" + newUser.getRole() + ")");
@@ -46,7 +52,7 @@ public class UserServiceImpl implements UserService {
     private UserEntity convertToEntity(UserRequest request) {
         return UserEntity.builder()
                 .userId(UUID.randomUUID().toString())
-                .email(request.getEmail())
+                .email(normalizeEmail(request.getEmail()))
                 .password(passwordEncoder.encode(request.getPassword()))
                 .role(request.getRole().toUpperCase())
                 .name(request.getName())
@@ -54,20 +60,23 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public String getUserRole(String email) {
-       UserEntity existingUser =userRepository.findByEmail(email)
-               .orElseThrow(()-> new UsernameNotFoundException("User not found for the email: "+ email));
+       UserEntity existingUser = userRepository.findByEmail(normalizeEmail(email))
+               .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found for the email: " + email));
        return existingUser.getRole();
     }
 
     @Override
+    @Transactional(readOnly = true)
     public UserResponse findByEmail(String email) {
-        UserEntity existingUser = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found for the email: " + email));
+        UserEntity existingUser = userRepository.findByEmail(normalizeEmail(email))
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found for the email: " + email));
         return convertToResponse(existingUser);
     }
 
     @Override
+    @Transactional(readOnly = true)
     public List<UserResponse> readUsers() {
         return userRepository.findAll()
                 .stream()
@@ -76,20 +85,22 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public void deleteUser(String id) {
-        UserEntity existingUser= userRepository.findByUserId(id)
-                .orElseThrow(()-> new UsernameNotFoundException("User not found"));
+        UserEntity existingUser = userRepository.findByUserId(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with id: " + id));
         userRepository.delete(existingUser);
         activityLogService.logActivity("DELETE", "USER", existingUser.getUserId(), "Deleted user: " + existingUser.getEmail());
     }
 
     @Override
+    @Transactional
     public UserResponse updateUser(String userId, UserRequest request) {
         UserEntity existingUser = userRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with id: " + userId));
 
         if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
-            String newEmail = request.getEmail().trim().toLowerCase();
+            String newEmail = normalizeEmail(request.getEmail());
             if (!newEmail.equalsIgnoreCase(existingUser.getEmail())) {
                 var otherUser = userRepository.findByEmail(newEmail);
                 if (otherUser.isPresent() && !otherUser.get().getUserId().equals(existingUser.getUserId())) {
@@ -118,5 +129,9 @@ public class UserServiceImpl implements UserService {
         existingUser = userRepository.save(existingUser);
         activityLogService.logActivity("UPDATE", "USER", existingUser.getUserId(), "Updated user: " + existingUser.getEmail() + " (" + existingUser.getRole() + ")");
         return convertToResponse(existingUser);
+    }
+
+    private String normalizeEmail(String email) {
+        return email != null ? email.trim().toLowerCase() : null;
     }
 }

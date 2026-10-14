@@ -39,7 +39,7 @@ ALTER TABLE `tbl_activity_logs` AUTO_INCREMENT = 1;
 INSERT INTO `tbl_category` (`id`, `category_id`, `name`, `description`, `bg_color`, `img_url`, `created_at`, `updated_at`) VALUES
 (1, 'cat-coffee-01', 'Cà phê & Espresso', 'Cà phê nguyên chất pha phin truyền thống và cà phê máy phong cách Ý', '#78350f', 'https://images.unsplash.com/photo-1514432324607-a09d9b4aefdd?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
 (2, 'cat-fruittea-02', 'Trà trái cây & Nhiệt đới', 'Thức uống thanh nhiệt mát lạnh kết hợp từ trà hoa quả nhiệt đới tươi ngon', '#ea580c', 'https://images.unsplash.com/photo-1556881286-fc6915169721?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
-(3, 'cat-milktea-03', 'Trà sữa & Macchiato', 'Trà sữa thơm ngon béo ngậy phối cùng trân châu và lớp Milk Foam trứ danh', '#d97706', 'https://images.unsplash.com/photo-1558857563-b37cf5a23075?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
+(3, 'cat-milktea-03', 'Trà sữa & Macchiato', 'Trà sữa thơm ngon béo ngậy phối cùng trân châu và lớp Milk Foam trứ danh', '#d97706', 'https://images.unsplash.com/photo-1589396575653-c09c794ff6a6?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
 (4, 'cat-juice-04', 'Sinh tố & Nước ép tươi', 'Sinh tố sánh mịn và nước ép 100% hoa quả tươi nguyên chất giàu dinh dưỡng', '#16a34a', 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
 (5, 'cat-iceblended-05', 'Đá xay & Đóng chai', 'Thức uống đá xay mát lạnh sảng khoái và nước ngọt, nước khoáng đóng lon/chai', '#0284c7', 'https://images.unsplash.com/photo-1572490122747-3968b75cc699?w=400&auto=format&fit=crop&q=80', NOW(), NOW());
 
@@ -85,13 +85,13 @@ INSERT INTO `tbl_items` (`id`, `item_id`, `name`, `description`, `price`, `categ
 (8, 'item-tea-chanhleo', 'Trà chanh leo kim quất', 'Cực phẩm giải nhiệt mùa nắng với vị chua thanh sảng khoái kích thích vị giác', 30000.00, 2, 'https://images.unsplash.com/photo-1513558161293-cdaf765ed2fd?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
 
 -- Nhóm 3: Trà sữa & Macchiato (category_id = 3)
-(9, 'item-milk-3ae', 'Trà sữa truyền thống ba anh em', 'Trà đen thơm ngát sữa béo, đầy đặn trân châu đen, thạch dừa và bánh pudding', 38000.00, 3, 'https://images.unsplash.com/photo-1558857563-b37cf5a23075?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
+(9, 'item-milk-3ae', 'Trà sữa truyền thống ba anh em', 'Trà đen thơm ngát sữa béo, đầy đặn trân châu đen, thạch dừa và bánh pudding', 38000.00, 3, 'https://images.unsplash.com/photo-1589396575653-c09c794ff6a6?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
 (10, 'item-milk-olongnuong', 'Trà sữa Ô long nướng', 'Hương trà ô long sao nướng đậm khói hòa quyện sữa tươi thanh ngọt cuốn hút', 40000.00, 3, 'https://images.unsplash.com/photo-1571934811356-5cc061b6821f?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
 (11, 'item-milk-thaidomacchiato', 'Trà Thái đỏ Macchiato', 'Trà Thái đỏ truyền thống phủ lớp kem cheese Macchiato mềm mượt thơm ngậy', 36000.00, 3, 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
 (12, 'item-milk-matchauji', 'Trà sữa Matcha Uji Nhật Bản', 'Bột matcha Uji thượng hạng hòa quyện sữa tươi tạo hương vị thanh đắng ngọt dịu', 42000.00, 3, 'https://images.unsplash.com/photo-1536256263959-770b48d82b0a?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
 
 -- Nhóm 4: Sinh tố & Nước ép (category_id = 4)
-(13, 'item-juice-bodua', 'Sinh tố bơ dừa sáp dẻo', 'Bơ sáp loại một xay nhuyễn cùng sữa đặc và nước cốt dừa tươi thơm béo', 45000.00, 4, 'https://images.unsplash.com/photo-1638176066666-ffb2f5c22a1f?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
+(13, 'item-juice-bodua', 'Sinh tố bơ dừa sáp dẻo', 'Bơ sáp loại một xay nhuyễn cùng sữa đặc và nước cốt dừa tươi thơm béo', 45000.00, 4, 'https://images.unsplash.com/photo-1603569283847-aa295f0d016a?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
 (14, 'item-juice-xoai', 'Sinh tố xoài cát nhiệt đới', 'Xoài cát chín vàng tự nhiên xay cùng sữa chua mát lạnh giàu vitamin', 40000.00, 4, 'https://images.unsplash.com/photo-1546173159-315724a31696?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
 (15, 'item-juice-camnguyenchat', 'Nước ép cam sành nguyên chất', 'Cam sành tươi mọng nước ép nguyên chất không pha đường giải nhiệt tuyệt vời', 35000.00, 4, 'https://images.unsplash.com/photo-1613478223719-2ab802602423?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
 (16, 'item-juice-taocarot', 'Nước ép táo cà rốt detox', 'Công thức nước ép thanh lọc cơ thể tươi mát từ táo đỏ Mỹ và cà rốt giòn ngọt', 38000.00, 4, 'https://images.unsplash.com/photo-1595981267035-7b04ca84a82d?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
@@ -99,7 +99,7 @@ INSERT INTO `tbl_items` (`id`, `item_id`, `name`, `description`, `price`, `categ
 -- Nhóm 5: Đá xay & Đóng chai (category_id = 5)
 (17, 'item-ice-caramel', 'Cà phê Caramel đá xay', 'Espresso đậm vị xay cùng sốt caramel cao cấp, phủ ngọn kem tươi béo ngậy', 48000.00, 5, 'https://images.unsplash.com/photo-1572490122747-3968b75cc699?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
 (18, 'item-ice-matchacookie', 'Matcha Cookie đá xay', 'Matcha đá xay hòa cùng bánh quy oreo vụn giòn rụm thơm lừng', 48000.00, 5, 'https://images.unsplash.com/photo-1577805947697-89e18249d767?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
-(19, 'item-bot-lavie', 'Nước khoáng Lavie 500ml', 'Nước khoáng thiên nhiên đóng chai tiện lợi bổ sung khoáng chất', 12000.00, 5, 'https://images.unsplash.com/photo-1548839140-29a749e1bc4e?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
+(19, 'item-bot-lavie', 'Nước khoáng Lavie 500ml', 'Nước khoáng thiên nhiên đóng chai tiện lợi bổ sung khoáng chất', 12000.00, 5, 'https://images.unsplash.com/photo-1616118132534-381148898bb4?w=400&auto=format&fit=crop&q=80', NOW(), NOW()),
 (20, 'item-bot-redbull', 'Nước tăng lực Red Bull lon', 'Nước tăng lực lon vàng đem lại năng lượng tỉnh táo tức thì', 20000.00, 5, 'https://images.unsplash.com/photo-1622543925917-763c34d1a86e?w=400&auto=format&fit=crop&q=80', NOW(), NOW());
 
 -- 6. GÁN ITEM VỚI MODIFIER GROUPS (tbl_item_modifier_groups)

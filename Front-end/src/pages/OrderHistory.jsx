@@ -1,11 +1,13 @@
-import { useState, useDeferredValue } from "react";
+import { useState, useDeferredValue, lazy, Suspense } from "react";
 import { useDebounce } from "../hooks/useDebounce";
 import { useOrders } from "../features/Orders/useOrders";
 import { useOrderLifecycle } from "../features/Orders/useOrderLifecycle";
 import Spinner from "../ui/Spinner";
 import ConfirmDeleteModal from "../ui/ConfirmDeleteModal";
 import { formatCurrency } from "../utils/formatCurrency";
-import ReceiptPopup from "../features/Explore/ReceiptPopup";
+
+const ReceiptPopup = lazy(() => import("../features/Explore/ReceiptPopup"));
+const preloadReceiptPopup = () => import("../features/Explore/ReceiptPopup");
 import {
   Receipt,
   PackageOpen,
@@ -315,6 +317,7 @@ function OrderHistory() {
                             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 hover:bg-slate-50 text-slate-700 text-xs font-medium transition-colors cursor-pointer"
                             title="Xem & In hóa đơn"
                             onClick={() => setSelectedOrderForReceipt(order)}
+                            onMouseEnter={preloadReceiptPopup}
                           >
                             <Receipt size={14} className="text-blue-600" />
                             <span>In hóa đơn</span>
@@ -439,11 +442,13 @@ function OrderHistory() {
 
       {/* Receipt Modal */}
       {selectedOrderForReceipt && (
-        <ReceiptPopup
-          order={selectedOrderForReceipt}
-          isOpen={Boolean(selectedOrderForReceipt)}
-          onClose={() => setSelectedOrderForReceipt(null)}
-        />
+        <Suspense fallback={null}>
+          <ReceiptPopup
+            order={selectedOrderForReceipt}
+            isOpen={Boolean(selectedOrderForReceipt)}
+            onClose={() => setSelectedOrderForReceipt(null)}
+          />
+        </Suspense>
       )}
 
       {/* Switch to Cash Confirmation Modal */}

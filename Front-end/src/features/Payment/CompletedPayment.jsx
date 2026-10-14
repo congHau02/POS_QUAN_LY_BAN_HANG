@@ -1,7 +1,9 @@
-import { useState } from "react";
+import { useState, lazy, Suspense } from "react";
 import { formatCurrency } from "../../utils/formatCurrency";
-import ReceiptPopup from "../Explore/ReceiptPopup";
 import { CheckCircle2, Receipt } from "lucide-react";
+
+const ReceiptPopup = lazy(() => import("../Explore/ReceiptPopup"));
+const preloadReceiptPopup = () => import("../Explore/ReceiptPopup");
 
 function CompletedPayment({ orderId, order }) {
   const [showReceipt, setShowReceipt] = useState(false);
@@ -44,6 +46,7 @@ function CompletedPayment({ orderId, order }) {
             type="button"
             className="inline-flex items-center gap-1.5 px-4 py-2 mt-4 rounded-lg border border-emerald-300 hover:bg-emerald-100/50 text-emerald-800 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
             onClick={() => setShowReceipt(true)}
+            onMouseEnter={preloadReceiptPopup}
           >
             <Receipt size={15} />
             <span>Xem & In hóa đơn</span>
@@ -52,11 +55,13 @@ function CompletedPayment({ orderId, order }) {
       </div>
 
       {showReceipt && (
-        <ReceiptPopup
-          order={currentOrder}
-          isOpen={showReceipt}
-          onClose={() => setShowReceipt(false)}
-        />
+        <Suspense fallback={null}>
+          <ReceiptPopup
+            order={currentOrder}
+            isOpen={showReceipt}
+            onClose={() => setShowReceipt(false)}
+          />
+        </Suspense>
       )}
     </>
   );

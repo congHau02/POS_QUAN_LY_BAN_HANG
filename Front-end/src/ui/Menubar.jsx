@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { NavLink, useLocation } from "react-router-dom";
 import useLogout from "../features/Auth/useLogout";
 import { useCurrentUser } from "../hooks/useCurrentUser";
@@ -33,18 +33,33 @@ function Menubar() {
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const manageRef = useOutsideClick(() => setIsManageOpen(false));
-  const profileRef = useOutsideClick(() => setIsProfileOpen(false));
-  const navRef = useOutsideClick(() => setIsMobileMenuOpen(false));
+  const manageRef = useRef(null);
+  const profileRef = useRef(null);
+  const navRef = useRef(null);
+
+  // Single unified listener for outside clicks across all menus
+  useOutsideClick((e) => {
+    if (isManageOpen && manageRef.current && !manageRef.current.contains(e.target)) {
+      setIsManageOpen(false);
+    }
+    if (isProfileOpen && profileRef.current && !profileRef.current.contains(e.target)) {
+      setIsProfileOpen(false);
+    }
+    if (isMobileMenuOpen && navRef.current && !navRef.current.contains(e.target)) {
+      setIsMobileMenuOpen(false);
+    }
+  });
 
   // Auto-close dropdowns and mobile menu on route changes
-  const [prevPathname, setPrevPathname] = useState(location.pathname);
-  if (location.pathname !== prevPathname) {
-    setPrevPathname(location.pathname);
-    setIsManageOpen(false);
-    setIsProfileOpen(false);
-    setIsMobileMenuOpen(false);
-  }
+  const prevPathname = useRef(location.pathname);
+  useEffect(() => {
+    if (location.pathname !== prevPathname.current) {
+      prevPathname.current = location.pathname;
+      setIsManageOpen(false);
+      setIsProfileOpen(false);
+      setIsMobileMenuOpen(false);
+    }
+  }, [location.pathname]);
 
   return (
     <nav ref={navRef} className="bg-white/90 backdrop-blur-md border-b border-slate-200 sticky top-0 z-50">

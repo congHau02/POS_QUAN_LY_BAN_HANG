@@ -122,10 +122,4 @@ public class AuthController {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Email hoặc mật khẩu không chính xác");
         }
     }
-
-    @PostMapping("/encode")
-    public String encodePassword(@RequestBody Map<String, String> request) {
-        return passwordEncoder.encode(request.get("password"));
-    }
-
 }

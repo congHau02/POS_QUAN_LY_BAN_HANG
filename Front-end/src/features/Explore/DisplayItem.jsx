@@ -1,7 +1,9 @@
-import { useState, memo } from "react";
+import { useState, memo, lazy, Suspense } from "react";
 import { formatCurrency } from "../../utils/formatCurrency";
-import POSItemModal from "./POSItemModal";
 import { Plus } from "lucide-react";
+
+const POSItemModal = lazy(() => import("./POSItemModal"));
+const preloadPOSItemModal = () => import("./POSItemModal");
 
 function DisplayItem({ addToCart, item }) {
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -32,6 +34,11 @@ function DisplayItem({ addToCart, item }) {
       <div
         className="p-3 bg-white rounded-xl border border-slate-200 shadow-xs hover:shadow-md hover:border-blue-400 transition-all cursor-pointer flex items-center justify-between gap-3 group"
         onClick={handleCardClick}
+        onMouseEnter={() => {
+          if (needsCustomization) {
+            preloadPOSItemModal();
+          }
+        }}
       >
         <div className="flex items-center gap-3 min-w-0">
           <img
@@ -78,14 +85,16 @@ function DisplayItem({ addToCart, item }) {
         </button>
       </div>
 
-      {isModalOpen && (
-        <POSItemModal
-          item={item}
-          isOpen={isModalOpen}
-          onClose={() => setIsModalOpen(false)}
-          onAddToCart={addToCart}
-        />
-      )}
+      <Suspense fallback={null}>
+        {isModalOpen && (
+          <POSItemModal
+            item={item}
+            isOpen={isModalOpen}
+            onClose={() => setIsModalOpen(false)}
+            onAddToCart={addToCart}
+          />
+        )}
+      </Suspense>
     </>
   );
 }

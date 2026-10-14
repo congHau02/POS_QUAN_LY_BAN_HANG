@@ -26,8 +26,15 @@ public class FileUploadServiceImpl implements FileUploadService {
 
     @Override
     public String uploadFile(MultipartFile file) {
-        String filenameExtenstion = file.getOriginalFilename().substring(file.getOriginalFilename().lastIndexOf(".")+1);
-        String key = UUID.randomUUID().toString()+"."+filenameExtenstion;
+        if (file == null || file.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Tệp tải lên không được để trống");
+        }
+        String originalFilename = file.getOriginalFilename();
+        String filenameExtension = "";
+        if (originalFilename != null && originalFilename.lastIndexOf(".") >= 0) {
+            filenameExtension = originalFilename.substring(originalFilename.lastIndexOf(".") + 1);
+        }
+        String key = filenameExtension.isEmpty() ? UUID.randomUUID().toString() : UUID.randomUUID().toString() + "." + filenameExtension;
         try {
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                     .bucket(bucketName)
@@ -35,21 +42,23 @@ public class FileUploadServiceImpl implements FileUploadService {
                     .acl("public-read")
                     .contentType(file.getContentType())
                     .build();
-            PutObjectResponse response =s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
-            if(response.sdkHttpResponse().isSuccessful()) {
-                return "https://"+bucketName+".s3.amazonaws.com/"+key;
-
+            PutObjectResponse response = s3Client.putObject(putObjectRequest, RequestBody.fromBytes(file.getBytes()));
+            if (response.sdkHttpResponse().isSuccessful()) {
+                return "https://" + bucketName + ".s3.amazonaws.com/" + key;
             } else {
-                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "An error while up load IMG");
+                throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Tải lên tệp S3 thất bại");
             }
         } catch (IOException e) {
-            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "An error while upload IMG");
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Lỗi đọc dữ liệu tệp tải lên: " + e.getMessage());
         }
     }
 
     @Override
     public boolean deleteFile(String imgUrl) {
-        String filename = imgUrl.substring(imgUrl.lastIndexOf("/")+1);
+        if (imgUrl == null || imgUrl.isBlank()) {
+            return false;
+        }
+        String filename = imgUrl.substring(imgUrl.lastIndexOf("/") + 1);
         DeleteObjectRequest deleteObjectRequest = DeleteObjectRequest.builder()
                 .bucket(bucketName)
                 .key(filename)

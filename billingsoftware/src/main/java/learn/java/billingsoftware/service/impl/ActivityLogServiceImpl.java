@@ -14,6 +14,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -64,6 +65,7 @@ public class ActivityLogServiceImpl implements ActivityLogService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public ActivityLogPageResponse getActivityLogs(int page, int size, String userEmail, String action,
                                                    String startDate, String endDate,
                                                    String authenticatedEmail, boolean isAdmin) {
