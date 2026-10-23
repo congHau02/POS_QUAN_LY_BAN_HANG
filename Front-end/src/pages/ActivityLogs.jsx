@@ -2,6 +2,7 @@ import { useState, useDeferredValue } from "react";
 import { useDebounce } from "../hooks/useDebounce";
 import { useActivityLogs } from "../features/ActivityLogs/useActivityLogs";
 import { useCurrentUser } from "../hooks/useCurrentUser";
+import { computeDatePresetRange, formatLocalDateTime } from "../utils/activityLogDates";
 import Spinner from "../ui/Spinner";
 import {
   Activity,
@@ -32,27 +33,10 @@ function ActivityLogs() {
     setDatePreset(preset);
     setPage(0);
 
-    const now = new Date();
-    const formatDateStr = (d) => d.toISOString().split("T")[0];
-
-    if (preset === "today") {
-      const todayStr = formatDateStr(now);
-      setStartDate(todayStr);
-      setEndDate(todayStr);
-    } else if (preset === "7days") {
-      const past = new Date();
-      past.setDate(now.getDate() - 7);
-      setStartDate(formatDateStr(past));
-      setEndDate(formatDateStr(now));
-    } else if (preset === "30days") {
-      const past = new Date();
-      past.setDate(now.getDate() - 30);
-      setStartDate(formatDateStr(past));
-      setEndDate(formatDateStr(now));
-    } else {
-      setStartDate("");
-      setEndDate("");
-    }
+    const { startDate: nextStartDate, endDate: nextEndDate } =
+      computeDatePresetRange(preset);
+    setStartDate(nextStartDate);
+    setEndDate(nextEndDate);
   };
 
   const {
@@ -71,16 +55,7 @@ function ActivityLogs() {
   });
 
   const formatDate = (dateString) => {
-    if (!dateString) return "";
-    const options = {
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    };
-    return new Date(dateString).toLocaleDateString("vi-VN", options);
+    return formatLocalDateTime(dateString, { second: "2-digit" });
   };
 
   const getActionBadge = (action) => {

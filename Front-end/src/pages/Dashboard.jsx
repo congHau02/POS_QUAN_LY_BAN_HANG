@@ -1,6 +1,7 @@
 import { useDashboard } from "../features/Dashboard/useDashboard";
 import Spinner from "../ui/Spinner";
 import { formatCurrency } from "../utils/formatCurrency";
+import { formatLocalDateTime } from "../utils/activityLogDates";
 import { Coins, ShoppingCart, History } from "lucide-react";
 
 const PAYMENT_METHOD_LABELS = {
@@ -134,15 +135,7 @@ function Dashboard() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                      {order.createdAt
-                        ? new Date(order.createdAt).toLocaleTimeString([], {
-                            day: "2-digit",
-                            month: "2-digit",
-                            year: "numeric",
-                            hour: "2-digit",
-                            minute: "2-digit",
-                          })
-                        : "—"}
+                      {order.createdAt ? formatLocalDateTime(order.createdAt) : "—"}
                     </td>
                   </tr>
                 );
