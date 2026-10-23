@@ -13,5 +13,5 @@ export function useCustomers(query = "", page = 0, size = 20) {
     ? customersData
     : (customersData?.content || []);
 
-  return { isLoading, isFetching, error, customers: customerList, rawData: customersData };
+  return { isLoading, isFetching, error, customers: customerList, pagination: customersData };
 }

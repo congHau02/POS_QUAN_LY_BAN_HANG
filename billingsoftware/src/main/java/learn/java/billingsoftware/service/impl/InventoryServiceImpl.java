@@ -152,7 +152,7 @@ public class InventoryServiceImpl implements InventoryService {
     @Override
     @Transactional(readOnly = true)
     public Page<InventoryTransactionResponse> getAllTransactions(Pageable pageable) {
-        return inventoryTransactionRepository.findAllByOrderByCreatedAtDesc(pageable)
+        return inventoryTransactionRepository.findAll(pageable)
                 .map(tx -> convertToResponse(tx, null));
     }
 

@@ -115,9 +115,52 @@ public class QueryOptimizationAndPaginationIntegrationTest {
                         .with(user("cashier").roles("USER")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$", isA(java.util.List.class)))
+                .andExpect(jsonPath("$", hasSize(1)))
                 .andExpect(jsonPath("$[0].itemId", is(item.getItemId())))
                 .andExpect(jsonPath("$[0].categoryName", is("Beverages")))
                 .andExpect(jsonPath("$[0].variants", hasSize(2)));
+    }
+
+    @Test
+    @DisplayName("GET /items loads multiple catalog items with variants without Cartesian explosion")
+    @WithMockUser(username = "cashier", roles = {"USER"})
+    void testGetItemsMultipleCatalogItemsWithoutDuplication() throws Exception {
+        // Create 2nd item with 2 variants
+        ItemEntity item2 = itemRepository.save(ItemEntity.builder()
+                .itemId("ITEM-" + UUID.randomUUID().toString().substring(0, 8))
+                .name("Hot Cappuccino")
+                .description("Warm steamed milk")
+                .price(new BigDecimal("50000.00"))
+                .category(category)
+                .build());
+
+        variantRepository.save(VariantEntity.builder()
+                .variantId("VAR-" + UUID.randomUUID().toString().substring(0, 8))
+                .sku("SKU-CAP-M-" + UUID.randomUUID().toString().substring(0, 5))
+                .basePrice(new BigDecimal("50000.00"))
+                .cachedStockQuantity(20)
+                .attributes(Map.of("size", "M"))
+                .item(item2)
+                .build());
+
+        variantRepository.save(VariantEntity.builder()
+                .variantId("VAR-" + UUID.randomUUID().toString().substring(0, 8))
+                .sku("SKU-CAP-L-" + UUID.randomUUID().toString().substring(0, 5))
+                .basePrice(new BigDecimal("60000.00"))
+                .cachedStockQuantity(15)
+                .attributes(Map.of("size", "L"))
+                .item(item2)
+                .build());
+
+        entityManager.flush();
+        entityManager.clear();
+
+        mockMvc.perform(get("/items")
+                        .with(user("cashier").roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$", hasSize(2)))
+                .andExpect(jsonPath("$[0].variants", hasSize(2)))
+                .andExpect(jsonPath("$[1].variants", hasSize(2)));
     }
 
     @Test
@@ -170,6 +213,33 @@ public class QueryOptimizationAndPaginationIntegrationTest {
                 .andExpect(jsonPath("$.size", is(2)))
                 .andExpect(jsonPath("$.number", is(0)))
                 .andExpect(jsonPath("$.totalPages", greaterThanOrEqualTo(3)));
+    }
+
+    @Test
+    @DisplayName("GET /customers with search query applies pagination and filtering properly")
+    @WithMockUser(username = "staff", roles = {"USER"})
+    void testGetCustomersSearchQueryWithPagination() throws Exception {
+        for (int i = 1; i <= 4; i++) {
+            customerRepository.save(CustomerEntity.builder()
+                    .customerId("CUST-SRCH-" + i + "-" + UUID.randomUUID().toString().substring(0, 6))
+                    .name("TargetSearch " + i)
+                    .phoneNumber("096600000" + i)
+                    .email("target" + i + "@example.com")
+                    .totalSpent(0.0)
+                    .orderCount(0)
+                    .build());
+        }
+
+        mockMvc.perform(get("/customers")
+                        .param("query", "TargetSearch")
+                        .param("page", "0")
+                        .param("size", "2")
+                        .with(user("staff").roles("USER")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.content", hasSize(2)))
+                .andExpect(jsonPath("$.totalElements", is(4)))
+                .andExpect(jsonPath("$.totalPages", is(2)))
+                .andExpect(jsonPath("$.content[0].name", startsWith("TargetSearch")));
     }
 
     @Test

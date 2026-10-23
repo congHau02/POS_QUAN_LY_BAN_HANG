@@ -73,7 +73,7 @@ public class CustomerServiceImpl implements CustomerService {
         if (query != null && !query.trim().isEmpty()) {
             page = customerRepository.searchByNameOrPhoneNumber(query.trim(), pageable);
         } else {
-            page = customerRepository.findAllByOrderByCreatedAtDesc(pageable);
+            page = customerRepository.findAll(pageable);
         }
         return page.map(this::convertToResponse);
     }
