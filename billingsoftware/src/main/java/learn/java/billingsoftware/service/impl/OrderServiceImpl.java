@@ -35,6 +35,7 @@ import learn.java.billingsoftware.repository.VariantRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -57,6 +58,7 @@ public class OrderServiceImpl implements OrderService {
     private final CustomerRepository customerRepository;
     private final ActivityLogService activityLogService;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
 
     @Value("${payos.return-url:http://localhost:5173/payment/success}")
     private String payosReturnUrl;
@@ -65,8 +67,75 @@ public class OrderServiceImpl implements OrderService {
     private String payosCancelUrl;
 
     @Override
-    @Transactional
     public OrderResponse createOrder(OrderRequest request) {
+        // Phase 1: Isolated database transaction to persist initial order & inventory OUT ledger
+        OrderEntity initialOrder = transactionTemplate.execute(status -> persistInitialOrder(request));
+
+        if (initialOrder == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể khởi tạo đơn hàng");
+        }
+
+        // If payment method is CASH, complete immediately without gateway interaction
+        if (initialOrder.getPaymentMethod() == PaymentMethod.CASH) {
+            activityLogService.logActivity("CREATE", "ORDER", initialOrder.getOrderId(),
+                    "Created order #" + initialOrder.getOrderId() + " (" + initialOrder.getGrandTotal() + " VND)");
+            return convertToResponse(initialOrder);
+        }
+
+        // Phase 2: Remote gateway call executed strictly OUTSIDE of database transactions
+        CreatePaymentLinkResponse payOSResponse;
+        try {
+            long orderCode = initialOrder.getId();
+
+            List<PaymentLinkItem> payOSItems = initialOrder.getItems() != null ? initialOrder.getItems().stream()
+                    .map(item -> PaymentLinkItem.builder()
+                            .name(item.getName())
+                            .price(item.getPrice() != null ? item.getPrice().longValue() : 0L)
+                            .quantity(item.getQuantity() != null ? item.getQuantity() : 1)
+                            .build())
+                    .collect(Collectors.toList()) : new ArrayList<>();
+
+            CreatePaymentLinkRequest paymentRequest = CreatePaymentLinkRequest.builder()
+                    .orderCode(orderCode)
+                    .amount(initialOrder.getGrandTotal() != null ? initialOrder.getGrandTotal().longValue() : 0L)
+                    .description(formatPayOsDescription(initialOrder, orderCode))
+                    .returnUrl(payosReturnUrl)
+                    .cancelUrl(payosCancelUrl)
+                    .items(payOSItems)
+                    .build();
+
+            payOSResponse = payOS.paymentRequests().create(paymentRequest);
+        } catch (Exception e) {
+            log.error("PayOS gateway call failed for order #{}: {}", initialOrder.getOrderId(), e.getMessage());
+            // Phase 3b: Automated error reversal (compensate pending order & mark CANCELLED) in an isolated transaction
+            compensateAndCancelOrder(initialOrder, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Lỗi khi tạo mã thanh toán PayOS: " + e.getMessage(), e);
+        }
+
+        // Phase 3a: Success - update payment link details in an isolated transaction
+        OrderEntity updatedOrder = transactionTemplate.execute(status -> {
+            OrderEntity order = orderEntityRepository.findByOrderId(initialOrder.getOrderId())
+                    .orElse(initialOrder);
+            PaymentDetails paymentDetails = order.getPaymentDetails();
+            if (paymentDetails == null) {
+                paymentDetails = new PaymentDetails();
+                order.setPaymentDetails(paymentDetails);
+            }
+            paymentDetails.setPaymentLinkId(payOSResponse.getPaymentLinkId());
+            paymentDetails.setCheckoutUrl(payOSResponse.getCheckoutUrl());
+            paymentDetails.setQrCode(payOSResponse.getQrCode());
+            paymentDetails.setOrderId(order.getOrderId());
+
+            OrderEntity saved = orderEntityRepository.save(order);
+            activityLogService.logActivity("CREATE", "ORDER", saved.getOrderId(),
+                    "Created order #" + saved.getOrderId() + " (" + saved.getGrandTotal() + " VND)");
+            return saved;
+        });
+
+        return convertToResponse(updatedOrder != null ? updatedOrder : initialOrder);
+    }
+
+    private OrderEntity persistInitialOrder(OrderRequest request) {
         // 1. Server-side Promotion Evaluation & Totals Recalculation
         List<EvaluationCartItem> evalCartItems = new ArrayList<>();
         if (request.getCartItems() != null) {
@@ -188,46 +257,26 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // 8. PayOS Payment Link handling
-        if (newOrder.getPaymentMethod() == PaymentMethod.PAYOS) {
-            try {
-                long orderCode = newOrder.getId();
+        return newOrder;
+    }
 
-                List<PaymentLinkItem> payOSItems = newOrder.getItems().stream()
-                        .map(item -> PaymentLinkItem.builder()
-                                .name(item.getName())
-                                .price(item.getPrice().longValue())
-                                .quantity(item.getQuantity())
-                                .build())
-                        .collect(Collectors.toList());
+    private void compensateAndCancelOrder(OrderEntity initialOrder, String failureReason) {
+        transactionTemplate.executeWithoutResult(status -> {
+            OrderEntity order = orderEntityRepository.findByOrderId(initialOrder.getOrderId())
+                    .orElse(initialOrder);
 
-                CreatePaymentLinkRequest paymentRequest = CreatePaymentLinkRequest.builder()
-                        .orderCode(orderCode)
-                        .amount(newOrder.getGrandTotal().longValue())
-                        .description(formatPayOsDescription(newOrder, orderCode))
-                        .returnUrl(payosReturnUrl)
-                        .cancelUrl(payosCancelUrl)
-                        .items(payOSItems)
-                        .build();
-
-                CreatePaymentLinkResponse payOSResponse = payOS.paymentRequests().create(paymentRequest);
-
-                newOrder.getPaymentDetails().setPaymentLinkId(payOSResponse.getPaymentLinkId());
-                newOrder.getPaymentDetails().setCheckoutUrl(payOSResponse.getCheckoutUrl());
-                newOrder.getPaymentDetails().setQrCode(payOSResponse.getQrCode());
-                newOrder.getPaymentDetails().setOrderId(newOrder.getOrderId());
-
-                orderEntityRepository.save(newOrder);
-
-            } catch (PayOSException e) {
-                throw new RuntimeException("Lỗi khi tạo mã thanh toán PayOS: " + e.getMessage(), e);
-            } catch (Exception e) {
-                throw new RuntimeException("Lỗi khi tạo mã thanh toán PayOS: " + e.getMessage(), e);
+            PaymentDetails paymentDetails = order.getPaymentDetails();
+            if (paymentDetails == null) {
+                paymentDetails = new PaymentDetails();
+                order.setPaymentDetails(paymentDetails);
             }
-        }
+            paymentDetails.setStatus(PaymentDetails.PaymentStatus.CANCELLED);
 
-        activityLogService.logActivity("CREATE", "ORDER", newOrder.getOrderId(), "Created order #" + newOrder.getOrderId() + " (" + newOrder.getGrandTotal() + " VND)");
-        return convertToResponse(newOrder);
+            compensatePendingOrder(order, "Auto-Reversal PayOS Failure - Order #" + order.getOrderId(), "Lỗi cổng thanh toán PayOS");
+            orderEntityRepository.save(order);
+            activityLogService.logActivity("CANCEL", "ORDER", order.getOrderId(),
+                    "Auto-cancelled order #" + order.getOrderId() + " due to PayOS failure: " + failureReason);
+        });
     }
 
     private OrderItemEntity convertToOrderItemEntity(OrderRequest.OrderItemRequest orderItemRequest) {
@@ -514,6 +563,9 @@ public class OrderServiceImpl implements OrderService {
 
     private void cancelRemotePayOSPayment(OrderEntity order, String reason) {
         if (order.getPaymentMethod() == PaymentMethod.PAYOS) {
+            if (order.getPaymentDetails() != null && order.getPaymentDetails().getPaymentLinkId() == null) {
+                return;
+            }
             try {
                 payOS.paymentRequests().cancel(order.getId(), reason);
             } catch (Exception e) {

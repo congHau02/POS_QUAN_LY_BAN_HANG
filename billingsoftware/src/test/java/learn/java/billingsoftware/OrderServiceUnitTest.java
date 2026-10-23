@@ -16,6 +16,13 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.ArgumentCaptor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import learn.java.billingsoftware.entity.TransactionType;
+import org.springframework.http.HttpStatus;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.TransactionStatus;
+import org.springframework.transaction.support.TransactionTemplate;
+import org.springframework.web.server.ResponseStatusException;
 import org.springframework.test.util.ReflectionTestUtils;
 import vn.payos.PayOS;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkRequest;
@@ -58,6 +65,21 @@ class OrderServiceUnitTest {
 
     @BeforeEach
     void setUp() {
+        TransactionTemplate transactionTemplate = new TransactionTemplate(new PlatformTransactionManager() {
+            @Override
+            public TransactionStatus getTransaction(TransactionDefinition definition) {
+                return mock(TransactionStatus.class);
+            }
+
+            @Override
+            public void commit(TransactionStatus status) {
+            }
+
+            @Override
+            public void rollback(TransactionStatus status) {
+            }
+        });
+
         orderService = new OrderServiceImpl(
                 orderEntityRepository,
                 payOS,
@@ -67,7 +89,8 @@ class OrderServiceUnitTest {
                 promotionRepository,
                 customerRepository,
                 activityLogService,
-                objectMapper
+                objectMapper,
+                transactionTemplate
         );
         ReflectionTestUtils.setField(orderService, "payosReturnUrl", "https://app.com/success");
         ReflectionTestUtils.setField(orderService, "payosCancelUrl", "https://app.com/cancel");
@@ -218,5 +241,129 @@ class OrderServiceUnitTest {
         assertNotNull(payOsReq.getDescription());
         assertEquals(25, payOsReq.getDescription().length(), "Description should be truncated to exactly 25 chars");
         assertEquals(longOrderId.substring(0, 25), payOsReq.getDescription());
+    }
+    @Test
+    @DisplayName("PayOS payment link details are updated onto the order when gateway returns successfully")
+    void testCreateOrderWithPayOS_SuccessUpdatesPaymentDetails() throws Exception {
+        when(payOS.paymentRequests()).thenReturn(paymentRequestsService);
+
+        CreatePaymentLinkResponse mockPayOsResponse = CreatePaymentLinkResponse.builder()
+                .bin("970403")
+                .accountNumber("123456789")
+                .accountName("TEST STORE")
+                .amount(50000L)
+                .description("TEST SUCCESS")
+                .orderCode(777L)
+                .currency("VND")
+                .paymentLinkId("LINK-PAYOS-777")
+                .checkoutUrl("https://payos.vn/checkout/777")
+                .qrCode("00020101...")
+                .status(PaymentLinkStatus.PENDING)
+                .build();
+        when(paymentRequestsService.create(any(CreatePaymentLinkRequest.class))).thenReturn(mockPayOsResponse);
+
+        PromotionEvaluationResponse evalResponse = PromotionEvaluationResponse.builder()
+                .subtotal(BigDecimal.valueOf(50000.0))
+                .discountAmount(BigDecimal.ZERO)
+                .tax(BigDecimal.ZERO)
+                .grandTotal(BigDecimal.valueOf(50000.0))
+                .build();
+        when(promotionService.evaluatePromotion(any(PromotionEvaluationRequest.class))).thenReturn(evalResponse);
+
+        when(orderEntityRepository.save(any(OrderEntity.class))).thenAnswer(invocation -> {
+            OrderEntity entity = invocation.getArgument(0);
+            if (entity.getId() == null) {
+                entity.setId(777L);
+            }
+            if (entity.getOrderId() == null) {
+                entity.onCreate();
+            }
+            return entity;
+        });
+
+        OrderRequest request = new OrderRequest();
+        request.setCustomerName("Nguyen Van C");
+        request.setPhoneNumber("0977777777");
+        request.setPaymentMethod("PAYOS");
+        request.setCartItems(List.of());
+
+        OrderResponse response = orderService.createOrder(request);
+
+        assertNotNull(response.getPaymentDetails());
+        assertEquals("LINK-PAYOS-777", response.getPaymentDetails().getPaymentLinkId());
+        assertEquals("https://payos.vn/checkout/777", response.getPaymentDetails().getCheckoutUrl());
+        assertEquals("00020101...", response.getPaymentDetails().getQrCode());
+        assertEquals(PaymentDetails.PaymentStatus.PENDING, response.getPaymentDetails().getStatus());
+    }
+
+    @Test
+    @DisplayName("PayOS gateway failure triggers automated compensating stock reversal and throws 502 Bad Gateway")
+    void testCreateOrderWithPayOS_GatewayFailureReleasesAndCompensatesStock() throws Exception {
+        when(payOS.paymentRequests()).thenReturn(paymentRequestsService);
+        when(paymentRequestsService.create(any(CreatePaymentLinkRequest.class)))
+                .thenThrow(new RuntimeException("PayOS network timeout"));
+
+        PromotionEvaluationResponse evalResponse = PromotionEvaluationResponse.builder()
+                .subtotal(BigDecimal.valueOf(60000.0))
+                .discountAmount(BigDecimal.ZERO)
+                .tax(BigDecimal.ZERO)
+                .grandTotal(BigDecimal.valueOf(60000.0))
+                .build();
+        when(promotionService.evaluatePromotion(any(PromotionEvaluationRequest.class))).thenReturn(evalResponse);
+
+        when(orderEntityRepository.save(any(OrderEntity.class))).thenAnswer(invocation -> {
+            OrderEntity entity = invocation.getArgument(0);
+            if (entity.getId() == null) {
+                entity.setId(555L);
+            }
+            if (entity.getOrderId() == null) {
+                entity.onCreate();
+            }
+            return entity;
+        });
+
+        VariantEntity variant = VariantEntity.builder()
+                .variantId("VAR-999")
+                .cachedStockQuantity(10)
+                .build();
+        when(variantRepository.findByVariantId("VAR-999")).thenReturn(Optional.of(variant));
+        when(inventoryTransactionRepository.calculateStockByVariantId("VAR-999")).thenReturn(10);
+
+        OrderRequest.OrderItemRequest itemReq = new OrderRequest.OrderItemRequest();
+        itemReq.setItemId("ITEM-999");
+        itemReq.setVariantId("VAR-999");
+        itemReq.setName("Failed Item");
+        itemReq.setPrice(60000.0);
+        itemReq.setQuantity(2);
+
+        OrderRequest request = new OrderRequest();
+        request.setCustomerName("Failed User");
+        request.setPhoneNumber("0955555555");
+        request.setPaymentMethod("PAYOS");
+        request.setCartItems(List.of(itemReq));
+
+        ResponseStatusException ex = assertThrows(ResponseStatusException.class, () -> {
+            orderService.createOrder(request);
+        });
+
+        assertEquals(HttpStatus.BAD_GATEWAY, ex.getStatusCode());
+        assertTrue(ex.getReason().contains("Lỗi khi tạo mã thanh toán PayOS"));
+
+        // Verify that compensating IN transaction was recorded
+        ArgumentCaptor<InventoryTransactionEntity> invCaptor = ArgumentCaptor.forClass(InventoryTransactionEntity.class);
+        verify(inventoryTransactionRepository, atLeast(2)).saveAndFlush(invCaptor.capture());
+
+        List<InventoryTransactionEntity> savedTxs = invCaptor.getAllValues();
+        boolean hasCompensatingInTx = savedTxs.stream()
+                .anyMatch(tx -> tx.getTransactionType() == TransactionType.IN && tx.getQuantity() == 2);
+        assertTrue(hasCompensatingInTx, "Must record a compensating IN transaction to restore reserved stock");
+
+        // Verify activity log captured cancellation
+        verify(activityLogService).logActivity(
+                eq("CANCEL"),
+                eq("ORDER"),
+                anyString(),
+                contains("due to PayOS failure")
+        );
     }
 }
