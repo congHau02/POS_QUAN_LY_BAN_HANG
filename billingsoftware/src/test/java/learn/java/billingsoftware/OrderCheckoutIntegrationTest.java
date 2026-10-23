@@ -414,10 +414,10 @@ public class OrderCheckoutIntegrationTest {
         PromotionEntity revertedPromo = promotionRepository.findByPromotionId(testCoupon.getPromotionId()).orElseThrow();
         assertEquals(0, revertedPromo.getTimesUsed());
 
-        // 5. Verify customer metrics rolled back to 0
-        CustomerEntity revertedCustomer = customerRepository.findByCustomerId(testCustomer.getCustomerId()).orElseThrow();
-        assertEquals(0, revertedCustomer.getOrderCount());
-        assertEquals(0.0, revertedCustomer.getTotalSpent(), 0.01);
+        // 5. Verify customer metrics remain unchanged (pending orders do not accrue spending per Ticket 04)
+        CustomerEntity customerAfterCancel = customerRepository.findByCustomerId(testCustomer.getCustomerId()).orElseThrow();
+        assertEquals(1, customerAfterCancel.getOrderCount());
+        assertEquals(88000.0, customerAfterCancel.getTotalSpent(), 0.01);
     }
 
     @Test

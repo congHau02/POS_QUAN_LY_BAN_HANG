@@ -203,11 +203,11 @@ public class OrderServiceImpl implements OrderService {
             newOrder.setCustomerName(customer.getName());
             newOrder.setPhoneNumber(customer.getPhoneNumber());
 
-            int updatedOrderCount = (customer.getOrderCount() != null ? customer.getOrderCount() : 0) + 1;
-            customer.setOrderCount(updatedOrderCount);
-            double currentSpent = customer.getTotalSpent() != null ? customer.getTotalSpent() : 0.0;
-            customer.setTotalSpent(currentSpent + (newOrder.getGrandTotal() != null ? newOrder.getGrandTotal() : 0.0));
-            customerRepository.save(customer);
+            // Accrue customer metrics immediately only when payment method is CASH (order is COMPLETED upon creation)
+            if (newOrder.getPaymentMethod() == PaymentMethod.CASH) {
+                customer.accrueOrderSpending(newOrder.getGrandTotal());
+                customerRepository.save(customer);
+            }
         } else {
             newOrder.setCustomerId(null);
             if (newOrder.getCustomerName() == null || newOrder.getCustomerName().trim().isEmpty()) {
@@ -521,6 +521,9 @@ public class OrderServiceImpl implements OrderService {
         paymentDetails.setStatus(PaymentDetails.PaymentStatus.COMPLETED);
         order.setPaymentDetails(paymentDetails);
 
+        // 3. Accrue customer metrics upon settling with cash
+        accrueCustomerMetricsIfPresent(order);
+
         order = orderEntityRepository.save(order);
         activityLogService.logActivity("UPDATE", "ORDER", order.getOrderId(), "Switched payment method to CASH for order #" + order.getOrderId());
 
@@ -569,14 +572,9 @@ public class OrderServiceImpl implements OrderService {
             }
         }
 
-        // 3. Hoàn lại số liệu CRM của khách hàng nếu có
-        if (order.getCustomerId() != null && !order.getCustomerId().trim().isEmpty()) {
-            CustomerEntity customer = customerRepository.findByCustomerId(order.getCustomerId()).orElse(null);
-            if (customer != null) {
-                customer.revertOrderSpending(order.getGrandTotal());
-                customerRepository.save(customer);
-            }
-        }
+        // 3. Customer CRM metrics: Skipped for PENDING orders (Ticket 04)
+        // Loyalty metrics (totalSpent, orderCount) are accrued strictly upon COMPLETED payment status,
+        // so cancelling/deleting an in-flight PENDING order requires no reversal.
 
         // 4. Hủy liên kết PayOS từ xa nếu là PAYOS
         cancelRemotePayOSPayment(order, payosCancelReason);
@@ -612,8 +610,19 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng với orderCode: " + orderCode));
 
         PaymentDetails paymentDetails = order.getPaymentDetails();
-        if (paymentDetails != null && paymentDetails.getStatus() == PaymentDetails.PaymentStatus.COMPLETED) {
-            log.info("Order #{} is already COMPLETED. Ignoring redundant webhook delivery.", order.getOrderId());
+        if (paymentDetails != null) {
+            if (paymentDetails.getStatus() == PaymentDetails.PaymentStatus.COMPLETED) {
+                log.info("Order #{} is already COMPLETED. Ignoring redundant webhook delivery.", order.getOrderId());
+                return;
+            }
+            if (paymentDetails.getStatus() == PaymentDetails.PaymentStatus.CANCELLED) {
+                log.warn("Order #{} has already been CANCELLED. Ignoring late webhook delivery.", order.getOrderId());
+                return;
+            }
+        }
+
+        if (!"00".equals(data.getCode())) {
+            log.warn("PayOS Webhook reported non-success code {} for orderCode={}", data.getCode(), orderCode);
             return;
         }
 
@@ -623,7 +632,20 @@ public class OrderServiceImpl implements OrderService {
         }
         paymentDetails.setStatus(PaymentDetails.PaymentStatus.COMPLETED);
 
+        // Accrue customer metrics upon successful PayOS transaction confirmation
+        accrueCustomerMetricsIfPresent(order);
+
         orderEntityRepository.save(order);
         activityLogService.logActivity("PayOS-Webhook", "UPDATE", "ORDER", order.getOrderId(), "Payment confirmed via PayOS Webhook for order #" + order.getOrderId());
+    }
+
+    private void accrueCustomerMetricsIfPresent(OrderEntity order) {
+        if (order.getCustomerId() != null && !order.getCustomerId().trim().isEmpty()) {
+            CustomerEntity customer = customerRepository.findByCustomerId(order.getCustomerId().trim()).orElse(null);
+            if (customer != null) {
+                customer.accrueOrderSpending(order.getGrandTotal());
+                customerRepository.save(customer);
+            }
+        }
     }
 }

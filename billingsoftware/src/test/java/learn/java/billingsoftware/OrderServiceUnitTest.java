@@ -1,6 +1,8 @@
 package learn.java.billingsoftware;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import learn.java.billingsoftware.entity.CustomerEntity;
+import vn.payos.model.webhooks.WebhookData;
 import learn.java.billingsoftware.entity.InventoryTransactionEntity;
 import learn.java.billingsoftware.entity.OrderEntity;
 import learn.java.billingsoftware.entity.VariantEntity;
@@ -546,5 +548,264 @@ class OrderServiceUnitTest {
                 .mapToLong(i -> i.getPrice() * i.getQuantity())
                 .sum();
         assertEquals(capturedReq.getAmount(), sumItems, "Itemized sum must balance with grandTotal");
+    }
+
+    @Test
+    @DisplayName("Creating a PENDING PayOS order does not accrue customer spending or order count")
+    void testCreatePendingOrderDoesNotAccrueCustomerSpending() throws Exception {
+        when(payOS.paymentRequests()).thenReturn(paymentRequestsService);
+
+        CreatePaymentLinkResponse mockPayOsResponse = CreatePaymentLinkResponse.builder()
+                .bin("970403")
+                .accountNumber("123456789")
+                .accountName("TEST STORE")
+                .amount(110000L)
+                .description("TEST")
+                .orderCode(888L)
+                .currency("VND")
+                .paymentLinkId("LINK-001")
+                .checkoutUrl("https://payos.vn/checkout")
+                .qrCode("000201...")
+                .status(PaymentLinkStatus.PENDING)
+                .build();
+        when(paymentRequestsService.create(any(CreatePaymentLinkRequest.class))).thenReturn(mockPayOsResponse);
+
+        PromotionEvaluationResponse evalResponse = PromotionEvaluationResponse.builder()
+                .subtotal(BigDecimal.valueOf(100000.0))
+                .discountAmount(BigDecimal.ZERO)
+                .tax(BigDecimal.valueOf(10000.0))
+                .grandTotal(BigDecimal.valueOf(110000.0))
+                .build();
+        when(promotionService.evaluatePromotion(any(PromotionEvaluationRequest.class))).thenReturn(evalResponse);
+
+        when(orderEntityRepository.save(any(OrderEntity.class))).thenAnswer(invocation -> {
+            OrderEntity entity = invocation.getArgument(0);
+            if (entity.getId() == null) {
+                entity.setId(888L);
+            }
+            if (entity.getOrderId() == null) {
+                entity.onCreate();
+            }
+            return entity;
+        });
+
+        VariantEntity variant = VariantEntity.builder()
+                .variantId("VAR-123")
+                .cachedStockQuantity(20)
+                .build();
+        when(variantRepository.findByVariantId("VAR-123")).thenReturn(Optional.of(variant));
+        when(inventoryTransactionRepository.calculateStockByVariantId("VAR-123")).thenReturn(18);
+
+        CustomerEntity customer = CustomerEntity.builder()
+                .customerId("CUST-1")
+                .name("Nguyen Van A")
+                .phoneNumber("0912345678")
+                .orderCount(2)
+                .totalSpent(150000.0)
+                .build();
+        when(customerRepository.findByCustomerId("CUST-1")).thenReturn(Optional.of(customer));
+
+        OrderRequest.OrderItemRequest itemReq = new OrderRequest.OrderItemRequest();
+        itemReq.setItemId("ITEM-1");
+        itemReq.setVariantId("VAR-123");
+        itemReq.setName("Test Product");
+        itemReq.setPrice(50000.0);
+        itemReq.setQuantity(2);
+
+        OrderRequest request = new OrderRequest();
+        request.setCustomerId("CUST-1");
+        request.setCustomerName("Nguyen Van A");
+        request.setPhoneNumber("0912345678");
+        request.setPaymentMethod("PAYOS");
+        request.setCartItems(List.of(itemReq));
+
+        orderService.createOrder(request);
+
+        assertEquals(2, customer.getOrderCount(), "Order count must remain unchanged for PENDING order");
+        assertEquals(150000.0, customer.getTotalSpent(), 0.001, "Total spent must remain unchanged for PENDING order");
+    }
+
+    @Test
+    @DisplayName("Creating a CASH order accrues customer spending and order count immediately")
+    void testCreateCashOrderAccruesCustomerSpendingImmediately() throws Exception {
+        PromotionEvaluationResponse evalResponse = PromotionEvaluationResponse.builder()
+                .subtotal(BigDecimal.valueOf(100000.0))
+                .discountAmount(BigDecimal.ZERO)
+                .tax(BigDecimal.valueOf(10000.0))
+                .grandTotal(BigDecimal.valueOf(110000.0))
+                .build();
+        when(promotionService.evaluatePromotion(any(PromotionEvaluationRequest.class))).thenReturn(evalResponse);
+
+        when(orderEntityRepository.save(any(OrderEntity.class))).thenAnswer(invocation -> {
+            OrderEntity entity = invocation.getArgument(0);
+            if (entity.getId() == null) {
+                entity.setId(777L);
+            }
+            if (entity.getOrderId() == null) {
+                entity.onCreate();
+            }
+            return entity;
+        });
+
+        VariantEntity variant = VariantEntity.builder()
+                .variantId("VAR-123")
+                .cachedStockQuantity(20)
+                .build();
+        when(variantRepository.findByVariantId("VAR-123")).thenReturn(Optional.of(variant));
+        when(inventoryTransactionRepository.calculateStockByVariantId("VAR-123")).thenReturn(18);
+
+        CustomerEntity customer = CustomerEntity.builder()
+                .customerId("CUST-1")
+                .name("Nguyen Van A")
+                .phoneNumber("0912345678")
+                .orderCount(2)
+                .totalSpent(150000.0)
+                .build();
+        when(customerRepository.findByCustomerId("CUST-1")).thenReturn(Optional.of(customer));
+
+        OrderRequest.OrderItemRequest itemReq = new OrderRequest.OrderItemRequest();
+        itemReq.setItemId("ITEM-1");
+        itemReq.setVariantId("VAR-123");
+        itemReq.setName("Test Product");
+        itemReq.setPrice(50000.0);
+        itemReq.setQuantity(2);
+
+        OrderRequest request = new OrderRequest();
+        request.setCustomerId("CUST-1");
+        request.setCustomerName("Nguyen Van A");
+        request.setPhoneNumber("0912345678");
+        request.setPaymentMethod("CASH");
+        request.setCartItems(List.of(itemReq));
+
+        orderService.createOrder(request);
+
+        assertEquals(3, customer.getOrderCount(), "Order count must increment for CASH order");
+        assertEquals(260000.0, customer.getTotalSpent(), 0.001, "Total spent must accrue for CASH order");
+        verify(customerRepository).save(customer);
+    }
+
+    @Test
+    @DisplayName("handlePaymentWebhook with code 00 accrues customer spending idempotently")
+    void testHandlePaymentWebhookAccruesCustomerSpending() {
+        PaymentDetails pd = new PaymentDetails();
+        pd.setStatus(PaymentDetails.PaymentStatus.PENDING);
+
+        OrderEntity order = OrderEntity.builder()
+                .id(999L)
+                .orderId("ORD-999")
+                .customerId("CUST-1")
+                .customerName("Nguyen Van A")
+                .phoneNumber("0912345678")
+                .grandTotal(110000.0)
+                .paymentMethod(PaymentMethod.PAYOS)
+                .paymentDetails(pd)
+                .build();
+        when(orderEntityRepository.findById(999L)).thenReturn(Optional.of(order));
+
+        CustomerEntity customer = CustomerEntity.builder()
+                .customerId("CUST-1")
+                .name("Nguyen Van A")
+                .phoneNumber("0912345678")
+                .orderCount(1)
+                .totalSpent(50000.0)
+                .build();
+        when(customerRepository.findByCustomerId("CUST-1")).thenReturn(Optional.of(customer));
+
+        WebhookData webhookData = WebhookData.builder()
+                .orderCode(999L)
+                .amount(110000L)
+                .code("00")
+                .description("Payment for ORD-999")
+                .desc("Payment for ORD-999")
+                .accountNumber("123456789")
+                .reference("REF123")
+                .transactionDateTime("2026-10-23 16:30:00")
+                .currency("VND")
+                .paymentLinkId("LINK123")
+                .build();
+
+        orderService.handlePaymentWebhook(webhookData);
+
+        assertEquals(2, customer.getOrderCount());
+        assertEquals(160000.0, customer.getTotalSpent(), 0.001);
+        assertEquals(PaymentDetails.PaymentStatus.COMPLETED, order.getPaymentDetails().getStatus());
+
+        // Idempotency: call again
+        orderService.handlePaymentWebhook(webhookData);
+        assertEquals(2, customer.getOrderCount());
+        assertEquals(160000.0, customer.getTotalSpent(), 0.001);
+    }
+
+    @Test
+    @DisplayName("switchToCash accrues customer spending and marks order COMPLETED")
+    void testSwitchToCashAccruesCustomerSpending() {
+        PaymentDetails pd = new PaymentDetails();
+        pd.setStatus(PaymentDetails.PaymentStatus.PENDING);
+
+        OrderEntity order = OrderEntity.builder()
+                .id(555L)
+                .orderId("ORD-555")
+                .customerId("CUST-1")
+                .customerName("Nguyen Van A")
+                .phoneNumber("0912345678")
+                .grandTotal(75000.0)
+                .paymentMethod(PaymentMethod.PAYOS)
+                .paymentDetails(pd)
+                .build();
+        when(orderEntityRepository.findByOrderId("ORD-555")).thenReturn(Optional.of(order));
+        when(orderEntityRepository.save(any(OrderEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CustomerEntity customer = CustomerEntity.builder()
+                .customerId("CUST-1")
+                .name("Nguyen Van A")
+                .phoneNumber("0912345678")
+                .orderCount(0)
+                .totalSpent(0.0)
+                .build();
+        when(customerRepository.findByCustomerId("CUST-1")).thenReturn(Optional.of(customer));
+
+        orderService.switchToCash("ORD-555");
+
+        assertEquals(PaymentMethod.CASH, order.getPaymentMethod());
+        assertEquals(PaymentDetails.PaymentStatus.COMPLETED, order.getPaymentDetails().getStatus());
+        assertEquals(1, customer.getOrderCount());
+        assertEquals(75000.0, customer.getTotalSpent(), 0.001);
+        verify(customerRepository).save(customer);
+    }
+
+    @Test
+    @DisplayName("cancelOrder does not revert customer spending for PENDING orders")
+    void testCancelOrderDoesNotRevertCustomerSpendingForPendingOrder() {
+        PaymentDetails pd = new PaymentDetails();
+        pd.setStatus(PaymentDetails.PaymentStatus.PENDING);
+
+        OrderEntity order = OrderEntity.builder()
+                .id(444L)
+                .orderId("ORD-444")
+                .customerId("CUST-1")
+                .customerName("Nguyen Van A")
+                .phoneNumber("0912345678")
+                .grandTotal(75000.0)
+                .paymentMethod(PaymentMethod.PAYOS)
+                .paymentDetails(pd)
+                .build();
+        when(orderEntityRepository.findByOrderId("ORD-444")).thenReturn(Optional.of(order));
+        when(orderEntityRepository.save(any(OrderEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        CustomerEntity customer = CustomerEntity.builder()
+                .customerId("CUST-1")
+                .name("Nguyen Van A")
+                .phoneNumber("0912345678")
+                .orderCount(2)
+                .totalSpent(200000.0)
+                .build();
+
+        orderService.cancelOrder("ORD-444");
+
+        assertEquals(PaymentDetails.PaymentStatus.CANCELLED, order.getPaymentDetails().getStatus());
+        // Customer spending must not be reverted
+        verify(customerRepository, never()).save(any(CustomerEntity.class));
+        assertEquals(2, customer.getOrderCount());
+        assertEquals(200000.0, customer.getTotalSpent(), 0.001);
     }
 }
