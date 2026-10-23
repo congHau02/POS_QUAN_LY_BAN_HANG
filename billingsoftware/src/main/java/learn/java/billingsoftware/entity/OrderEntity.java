@@ -8,6 +8,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +20,9 @@ import java.util.List;
 @NoArgsConstructor
 @Builder
 public class OrderEntity {
+    private static final SecureRandom SECURE_RANDOM = new SecureRandom();
+    private static final String ALPHANUMERIC_CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -51,9 +55,26 @@ public class OrderEntity {
     @Enumerated(EnumType.STRING)
     private PaymentMethod paymentMethod;
 
+    private static String generateRandomSuffix(int length) {
+        StringBuilder sb = new StringBuilder(length);
+        for (int i = 0; i < length; i++) {
+            int index = SECURE_RANDOM.nextInt(ALPHANUMERIC_CHARS.length());
+            sb.append(ALPHANUMERIC_CHARS.charAt(index));
+        }
+        return sb.toString();
+    }
+
+    public static String generateOrderCode() {
+        return "ORD" + System.currentTimeMillis() + "-" + generateRandomSuffix(4);
+    }
+
     @PrePersist
-    protected void onCreate() {
-        this.orderId = "ORD"+System.currentTimeMillis();
-        this.createdAt = LocalDateTime.now();
+    public void onCreate() {
+        if (this.orderId == null || this.orderId.trim().isEmpty()) {
+            this.orderId = generateOrderCode();
+        }
+        if (this.createdAt == null) {
+            this.createdAt = LocalDateTime.now();
+        }
     }
 }

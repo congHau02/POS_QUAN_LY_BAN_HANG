@@ -204,7 +204,7 @@ public class OrderServiceImpl implements OrderService {
                 CreatePaymentLinkRequest paymentRequest = CreatePaymentLinkRequest.builder()
                         .orderCode(orderCode)
                         .amount(newOrder.getGrandTotal().longValue())
-                        .description("Thanh toan don " + orderCode)
+                        .description(formatPayOsDescription(newOrder, orderCode))
                         .returnUrl(payosReturnUrl)
                         .cancelUrl(payosCancelUrl)
                         .items(payOSItems)
@@ -248,6 +248,14 @@ public class OrderServiceImpl implements OrderService {
                 .quantity(orderItemRequest.getQuantity())
                 .selectedModifiers(modifiersJson)
                 .build();
+    }
+
+    private String formatPayOsDescription(OrderEntity order, long fallbackOrderCode) {
+        String code = order.getOrderId();
+        if (code == null || code.trim().isEmpty()) {
+            return "ORD" + fallbackOrderCode;
+        }
+        return code.length() > 25 ? code.substring(0, 25) : code;
     }
 
     private OrderResponse convertToResponse(OrderEntity newOrder) {
