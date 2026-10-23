@@ -27,6 +27,7 @@ import org.springframework.test.util.ReflectionTestUtils;
 import vn.payos.PayOS;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkRequest;
 import vn.payos.model.v2.paymentRequests.CreatePaymentLinkResponse;
+import vn.payos.model.v2.paymentRequests.PaymentLinkItem;
 import vn.payos.model.v2.paymentRequests.PaymentLinkStatus;
 import vn.payos.service.blocking.v2.paymentRequests.PaymentRequestsService;
 
@@ -365,5 +366,185 @@ class OrderServiceUnitTest {
                 anyString(),
                 contains("due to PayOS failure")
         );
+    }
+
+    @Test
+    @DisplayName("PayOS payload uses single aggregated item when discounts or taxes cause raw item sum to deviate from grandTotal")
+    void testCreateOrderWithPayOS_AggregatesItemWhenDiscountOrTaxDeviatesFromTotal() throws Exception {
+        when(payOS.paymentRequests()).thenReturn(paymentRequestsService);
+
+        CreatePaymentLinkResponse mockPayOsResponse = CreatePaymentLinkResponse.builder()
+                .bin("970403")
+                .accountNumber("123456789")
+                .accountName("TEST STORE")
+                .amount(99000L)
+                .description("TEST AGGREGATED")
+                .orderCode(12345L)
+                .currency("VND")
+                .paymentLinkId("LINK-PAYOS-12345")
+                .checkoutUrl("https://payos.vn/checkout/12345")
+                .qrCode("00020101...")
+                .status(PaymentLinkStatus.PENDING)
+                .build();
+        when(paymentRequestsService.create(any(CreatePaymentLinkRequest.class))).thenReturn(mockPayOsResponse);
+
+        // Subtotal = 100,000, Discount = 10,000, Tax = 9,000, GrandTotal = 99,000
+        PromotionEvaluationResponse evalResponse = PromotionEvaluationResponse.builder()
+                .subtotal(BigDecimal.valueOf(100000.0))
+                .discountAmount(BigDecimal.valueOf(10000.0))
+                .tax(BigDecimal.valueOf(9000.0))
+                .grandTotal(BigDecimal.valueOf(99000.0))
+                .build();
+        when(promotionService.evaluatePromotion(any(PromotionEvaluationRequest.class))).thenReturn(evalResponse);
+
+        when(orderEntityRepository.save(any(OrderEntity.class))).thenAnswer(invocation -> {
+            OrderEntity entity = invocation.getArgument(0);
+            if (entity.getId() == null) {
+                entity.setId(12345L);
+            }
+            if (entity.getOrderId() == null) {
+                entity.onCreate();
+            }
+            return entity;
+        });
+
+        VariantEntity variant1 = VariantEntity.builder().variantId("VAR-1").cachedStockQuantity(10).build();
+        VariantEntity variant2 = VariantEntity.builder().variantId("VAR-2").cachedStockQuantity(10).build();
+        when(variantRepository.findByVariantId("VAR-1")).thenReturn(Optional.of(variant1));
+        when(variantRepository.findByVariantId("VAR-2")).thenReturn(Optional.of(variant2));
+        when(inventoryTransactionRepository.calculateStockByVariantId("VAR-1")).thenReturn(10);
+        when(inventoryTransactionRepository.calculateStockByVariantId("VAR-2")).thenReturn(10);
+
+        OrderRequest.OrderItemRequest item1 = new OrderRequest.OrderItemRequest();
+        item1.setItemId("ITEM-1");
+        item1.setVariantId("VAR-1");
+        item1.setName("Product 1");
+        item1.setPrice(60000.0);
+        item1.setQuantity(1);
+
+        OrderRequest.OrderItemRequest item2 = new OrderRequest.OrderItemRequest();
+        item2.setItemId("ITEM-2");
+        item2.setVariantId("VAR-2");
+        item2.setName("Product 2");
+        item2.setPrice(40000.0);
+        item2.setQuantity(1);
+
+        OrderRequest request = new OrderRequest();
+        request.setCustomerName("Discounted User");
+        request.setPhoneNumber("0912345678");
+        request.setPaymentMethod("PAYOS");
+        request.setCartItems(List.of(item1, item2));
+
+        orderService.createOrder(request);
+
+        ArgumentCaptor<CreatePaymentLinkRequest> captor = ArgumentCaptor.forClass(CreatePaymentLinkRequest.class);
+        verify(paymentRequestsService).create(captor.capture());
+        CreatePaymentLinkRequest capturedReq = captor.getValue();
+
+        assertEquals(99000L, capturedReq.getAmount());
+        assertNotNull(capturedReq.getItems());
+        assertEquals(1, capturedReq.getItems().size(), "Must collapse to 1 aggregated item when discounted/taxed");
+
+        PaymentLinkItem aggregatedItem = capturedReq.getItems().get(0);
+        assertEquals("Don hang #12345", aggregatedItem.getName());
+        assertEquals(99000L, aggregatedItem.getPrice());
+        assertEquals(1, aggregatedItem.getQuantity());
+
+        // Verify total line sum strictly balances with grandTotal amount
+        long itemTotal = aggregatedItem.getPrice() * aggregatedItem.getQuantity();
+        assertEquals(capturedReq.getAmount(), itemTotal, "Line items sum must equal total amount");
+    }
+
+    @Test
+    @DisplayName("PayOS payload retains full itemized breakdown when no discounts or taxes alter item sums")
+    void testCreateOrderWithPayOS_RetainsItemizedBreakdownWhenNoDiscountsOrTaxes() throws Exception {
+        when(payOS.paymentRequests()).thenReturn(paymentRequestsService);
+
+        CreatePaymentLinkResponse mockPayOsResponse = CreatePaymentLinkResponse.builder()
+                .bin("970403")
+                .accountNumber("123456789")
+                .accountName("TEST STORE")
+                .amount(100000L)
+                .description("TEST ITEMIZED")
+                .orderCode(54321L)
+                .currency("VND")
+                .paymentLinkId("LINK-PAYOS-54321")
+                .checkoutUrl("https://payos.vn/checkout/54321")
+                .qrCode("00020101...")
+                .status(PaymentLinkStatus.PENDING)
+                .build();
+        when(paymentRequestsService.create(any(CreatePaymentLinkRequest.class))).thenReturn(mockPayOsResponse);
+
+        // Subtotal = 100,000, Discount = 0, Tax = 0, GrandTotal = 100,000
+        PromotionEvaluationResponse evalResponse = PromotionEvaluationResponse.builder()
+                .subtotal(BigDecimal.valueOf(100000.0))
+                .discountAmount(BigDecimal.ZERO)
+                .tax(BigDecimal.ZERO)
+                .grandTotal(BigDecimal.valueOf(100000.0))
+                .build();
+        when(promotionService.evaluatePromotion(any(PromotionEvaluationRequest.class))).thenReturn(evalResponse);
+
+        when(orderEntityRepository.save(any(OrderEntity.class))).thenAnswer(invocation -> {
+            OrderEntity entity = invocation.getArgument(0);
+            if (entity.getId() == null) {
+                entity.setId(54321L);
+            }
+            if (entity.getOrderId() == null) {
+                entity.onCreate();
+            }
+            return entity;
+        });
+
+        VariantEntity variant1 = VariantEntity.builder().variantId("VAR-1").cachedStockQuantity(10).build();
+        VariantEntity variant2 = VariantEntity.builder().variantId("VAR-2").cachedStockQuantity(10).build();
+        when(variantRepository.findByVariantId("VAR-1")).thenReturn(Optional.of(variant1));
+        when(variantRepository.findByVariantId("VAR-2")).thenReturn(Optional.of(variant2));
+        when(inventoryTransactionRepository.calculateStockByVariantId("VAR-1")).thenReturn(10);
+        when(inventoryTransactionRepository.calculateStockByVariantId("VAR-2")).thenReturn(10);
+
+        OrderRequest.OrderItemRequest item1 = new OrderRequest.OrderItemRequest();
+        item1.setItemId("ITEM-1");
+        item1.setVariantId("VAR-1");
+        item1.setName("Product 1");
+        item1.setPrice(60000.0);
+        item1.setQuantity(1);
+
+        OrderRequest.OrderItemRequest item2 = new OrderRequest.OrderItemRequest();
+        item2.setItemId("ITEM-2");
+        item2.setVariantId("VAR-2");
+        item2.setName("Product 2");
+        item2.setPrice(20000.0);
+        item2.setQuantity(2);
+
+        OrderRequest request = new OrderRequest();
+        request.setCustomerName("Regular User");
+        request.setPhoneNumber("0912345678");
+        request.setPaymentMethod("PAYOS");
+        request.setCartItems(List.of(item1, item2));
+
+        orderService.createOrder(request);
+
+        ArgumentCaptor<CreatePaymentLinkRequest> captor = ArgumentCaptor.forClass(CreatePaymentLinkRequest.class);
+        verify(paymentRequestsService).create(captor.capture());
+        CreatePaymentLinkRequest capturedReq = captor.getValue();
+
+        assertEquals(100000L, capturedReq.getAmount());
+        assertNotNull(capturedReq.getItems());
+        assertEquals(2, capturedReq.getItems().size(), "Must retain 2 items when no discounts or taxes alter sum");
+
+        PaymentLinkItem capturedItem1 = capturedReq.getItems().get(0);
+        assertEquals("Product 1", capturedItem1.getName());
+        assertEquals(60000L, capturedItem1.getPrice());
+        assertEquals(1, capturedItem1.getQuantity());
+
+        PaymentLinkItem capturedItem2 = capturedReq.getItems().get(1);
+        assertEquals("Product 2", capturedItem2.getName());
+        assertEquals(20000L, capturedItem2.getPrice());
+        assertEquals(2, capturedItem2.getQuantity());
+
+        long sumItems = capturedReq.getItems().stream()
+                .mapToLong(i -> i.getPrice() * i.getQuantity())
+                .sum();
+        assertEquals(capturedReq.getAmount(), sumItems, "Itemized sum must balance with grandTotal");
     }
 }

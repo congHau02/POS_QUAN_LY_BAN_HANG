@@ -39,6 +39,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -86,18 +87,38 @@ public class OrderServiceImpl implements OrderService {
         CreatePaymentLinkResponse payOSResponse;
         try {
             long orderCode = initialOrder.getId();
+            double discountAmount = initialOrder.getDiscountAmount() != null ? initialOrder.getDiscountAmount() : 0.0;
+            double tax = initialOrder.getTax() != null ? initialOrder.getTax() : 0.0;
+            long grandTotal = initialOrder.getGrandTotal() != null ? Math.round(initialOrder.getGrandTotal()) : 0L;
 
-            List<PaymentLinkItem> payOSItems = initialOrder.getItems() != null ? initialOrder.getItems().stream()
-                    .map(item -> PaymentLinkItem.builder()
-                            .name(item.getName())
-                            .price(item.getPrice() != null ? item.getPrice().longValue() : 0L)
-                            .quantity(item.getQuantity() != null ? item.getQuantity() : 1)
-                            .build())
-                    .collect(Collectors.toList()) : new ArrayList<>();
+            List<OrderItemEntity> orderItems = initialOrder.getItems() != null ? initialOrder.getItems() : Collections.emptyList();
+            long rawItemsTotal = orderItems.stream()
+                    .mapToLong(item -> (item.getPrice() != null ? Math.round(item.getPrice()) : 0L) * (item.getQuantity() != null ? item.getQuantity() : 1))
+                    .sum();
+
+            List<PaymentLinkItem> payOSItems;
+            if (rawItemsTotal != grandTotal || discountAmount > 0.0 || tax > 0.0 || orderItems.isEmpty()) {
+                // When discounts, taxes, or adjustments alter item sums, or for empty carts,
+                // submit a single aggregated item to ensure PayOS line-item amount balance
+                payOSItems = List.of(PaymentLinkItem.builder()
+                        .name("Don hang #" + orderCode)
+                        .price(grandTotal)
+                        .quantity(1)
+                        .build());
+            } else {
+                // When no discounts or taxes alter item sums, retain full itemized breakdown
+                payOSItems = orderItems.stream()
+                        .map(item -> PaymentLinkItem.builder()
+                                .name(item.getName())
+                                .price(item.getPrice() != null ? Math.round(item.getPrice()) : 0L)
+                                .quantity(item.getQuantity() != null ? item.getQuantity() : 1)
+                                .build())
+                        .collect(Collectors.toList());
+            }
 
             CreatePaymentLinkRequest paymentRequest = CreatePaymentLinkRequest.builder()
                     .orderCode(orderCode)
-                    .amount(initialOrder.getGrandTotal() != null ? initialOrder.getGrandTotal().longValue() : 0L)
+                    .amount(grandTotal)
                     .description(formatPayOsDescription(initialOrder, orderCode))
                     .returnUrl(payosReturnUrl)
                     .cancelUrl(payosCancelUrl)

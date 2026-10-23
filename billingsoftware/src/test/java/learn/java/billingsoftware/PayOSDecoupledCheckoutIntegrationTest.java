@@ -16,6 +16,13 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import learn.java.billingsoftware.entity.PromotionEntity;
+import learn.java.billingsoftware.entity.PromotionType;
+import learn.java.billingsoftware.entity.DiscountType;
+import learn.java.billingsoftware.repository.PromotionRepository;
+import vn.payos.model.v2.paymentRequests.PaymentLinkItem;
+import java.time.LocalDate;
+import java.util.concurrent.atomic.AtomicReference;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
@@ -65,6 +72,9 @@ public class PayOSDecoupledCheckoutIntegrationTest {
 
     @Autowired
     private OrderEntityRepository orderEntityRepository;
+
+    @Autowired
+    private PromotionRepository promotionRepository;
 
     @MockitoBean
     private PayOS payOS;
@@ -117,6 +127,7 @@ public class PayOSDecoupledCheckoutIntegrationTest {
     void tearDown() {
         inventoryTransactionRepository.deleteAll();
         orderEntityRepository.deleteAll();
+        promotionRepository.deleteAll();
         variantRepository.deleteAll();
         itemRepository.deleteAll();
         categoryRepository.deleteAll();
@@ -236,5 +247,87 @@ public class PayOSDecoupledCheckoutIntegrationTest {
                         && cancelledOrder.getOrderId().equals(tx.getReferenceId())
                         && tx.getQuantity() == 2);
         assertTrue(hasCompensatingInTx, "Must record a compensating IN transaction matching the cancelled order");
+    }
+
+    @Test
+    @DisplayName("PayOS payload balances with grandTotal using aggregated single item for discounted and taxed cart")
+    void testPayOSPayloadBalancesWithGrandTotalForDiscountedAndTaxedCart() throws Exception {
+        AtomicReference<CreatePaymentLinkRequest> capturedRequest = new AtomicReference<>();
+
+        when(paymentRequestsService.create(any(CreatePaymentLinkRequest.class))).thenAnswer(invocation -> {
+            CreatePaymentLinkRequest req = invocation.getArgument(0);
+            capturedRequest.set(req);
+
+            return CreatePaymentLinkResponse.builder()
+                    .bin("970403")
+                    .accountNumber("123456789")
+                    .accountName("TEST STORE")
+                    .amount(req.getAmount())
+                    .description(req.getDescription())
+                    .orderCode(req.getOrderCode())
+                    .currency("VND")
+                    .paymentLinkId("LINK-PAYOS-" + req.getOrderCode())
+                    .status(PaymentLinkStatus.PENDING)
+                    .checkoutUrl("https://payos.vn/checkout/" + req.getOrderCode())
+                    .qrCode("00020101...")
+                    .build();
+        });
+
+        // Setup promotion: 10,000 VND fixed discount coupon
+        promotionRepository.save(PromotionEntity.builder()
+                .promotionId("PROMO-" + UUID.randomUUID().toString().substring(0, 8))
+                .name("Discount 10k")
+                .type(PromotionType.COUPON)
+                .code("DISC10")
+                .discountType(DiscountType.FIXED_AMOUNT)
+                .discountValue(BigDecimal.valueOf(10000.0))
+                .isActive(true)
+                .startDate(LocalDate.now().minusDays(1))
+                .endDate(LocalDate.now().plusDays(1))
+                .build());
+
+        OrderRequest.OrderItemRequest itemRequest = OrderRequest.OrderItemRequest.builder()
+                .itemId(testItem.getItemId())
+                .variantId(testVariant.getVariantId())
+                .name(testItem.getName())
+                .price(60000.00)
+                .quantity(2)
+                .build();
+
+        OrderRequest request = OrderRequest.builder()
+                .customerName("Discounted Customer")
+                .phoneNumber("0912345678")
+                .couponCode("DISC10")
+                .paymentMethod("PAYOS")
+                .cartItems(List.of(itemRequest))
+                .build();
+
+        // Subtotal = 120,000; Discount = 10,000; DiscountedSubtotal = 110,000; Tax (10%) = 11,000; GrandTotal = 121,000
+        mockMvc.perform(post("/orders")
+                        .with(user("cashier").roles("USER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.orderId", notNullValue()))
+                .andExpect(jsonPath("$.subtotal", is(120000.0)))
+                .andExpect(jsonPath("$.discountAmount", is(10000.0)))
+                .andExpect(jsonPath("$.tax", is(11000.0)))
+                .andExpect(jsonPath("$.grandTotal", is(121000.0)))
+                .andExpect(jsonPath("$.paymentDetails.status", is("PENDING")));
+
+        CreatePaymentLinkRequest req = capturedRequest.get();
+        assertNotNull(req, "PayOS request should have been dispatched");
+        assertEquals(121000L, req.getAmount(), "Payment request amount must match grandTotal");
+
+        assertNotNull(req.getItems());
+        assertEquals(1, req.getItems().size(), "Discounted and taxed cart must be collapsed into 1 aggregated item");
+        PaymentLinkItem aggregatedItem = req.getItems().get(0);
+        assertEquals("Don hang #" + req.getOrderCode(), aggregatedItem.getName());
+        assertEquals(121000L, aggregatedItem.getPrice());
+        assertEquals(1, aggregatedItem.getQuantity());
+
+        // Strict PayOS balancing invariant: sum(price * quantity) == amount
+        long lineSum = aggregatedItem.getPrice() * aggregatedItem.getQuantity();
+        assertEquals(req.getAmount(), lineSum, "PayOS payload item sum must balance exactly with amount");
     }
 }
