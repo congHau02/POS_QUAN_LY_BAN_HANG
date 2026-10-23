@@ -4,10 +4,12 @@ import learn.java.billingsoftware.io.CustomerRequest;
 import learn.java.billingsoftware.io.CustomerResponse;
 import learn.java.billingsoftware.service.CustomerService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/customers")
@@ -23,8 +25,10 @@ public class CustomerController {
     }
 
     @GetMapping
-    public List<CustomerResponse> fetchAll(@RequestParam(value = "query", required = false) String query) {
-        return customerService.fetchCustomers(query);
+    public Page<CustomerResponse> fetchAll(
+            @RequestParam(value = "query", required = false) String query,
+            @PageableDefault(page = 0, size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return customerService.fetchCustomers(query, pageable);
     }
 
     @GetMapping("/{customerId}")

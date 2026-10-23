@@ -1,6 +1,8 @@
 package learn.java.billingsoftware.repository;
 
 import learn.java.billingsoftware.entity.InventoryTransactionEntity;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -17,6 +19,8 @@ public interface InventoryTransactionRepository extends JpaRepository<InventoryT
     List<InventoryTransactionEntity> findByVariant_VariantIdOrderByCreatedAtDesc(String variantId);
 
     List<InventoryTransactionEntity> findAllByOrderByCreatedAtDesc();
+
+    Page<InventoryTransactionEntity> findAllByOrderByCreatedAtDesc(Pageable pageable);
 
     @Query("SELECT COALESCE(SUM(t.quantity), 0) FROM InventoryTransactionEntity t WHERE t.variant.variantId = :variantId")
     Integer calculateStockByVariantId(@Param("variantId") String variantId);
