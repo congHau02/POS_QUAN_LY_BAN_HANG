@@ -1,11 +1,8 @@
 import { memo } from "react";
 import { Trash2, User, Edit3 } from "lucide-react";
-import { useCurrentUser } from "../../hooks/useCurrentUser";
 import { isSelfAccount } from "./userUtils";
 
-function UserItem({ user, onEdit, onDelete, currentUser: propCurrentUser }) {
-  const { user: hookCurrentUser } = useCurrentUser();
-  const currentUser = propCurrentUser || hookCurrentUser;
+function UserItem({ user, onEdit, onDelete, currentUser }) {
   const isSelf = isSelfAccount(user, currentUser);
 
   return (

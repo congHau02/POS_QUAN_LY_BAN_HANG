@@ -15,6 +15,7 @@ import {
 import { useCartCalculations } from "./useCartCalculations";
 import { getPromotionErrorMessage } from "../../utils/promotionErrorMessages";
 import { buildCustomerOrderPayload } from "../../utils/customerSync";
+import { getOrderStatus } from "../Payment/orderTerminalState";
 import { Tag, Banknote, CreditCard, X } from "lucide-react";
 
 function CartSummary({
@@ -150,11 +151,7 @@ function CartSummary({
     setShowModal(false);
     const activeId = orderData?.orderId || orderData?.data?.orderId;
     const cachedData = queryClient.getQueryData(["order", activeId]);
-    const status =
-      cachedData?.paymentDetails?.status ||
-      cachedData?.data?.paymentDetails?.status ||
-      orderData?.paymentDetails?.status ||
-      orderData?.data?.paymentDetails?.status;
+    const status = getOrderStatus(cachedData) || getOrderStatus(orderData);
     if (status === "COMPLETED") {
       handleClearCart();
     }

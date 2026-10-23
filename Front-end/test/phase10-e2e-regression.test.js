@@ -120,7 +120,7 @@ test("Phase 10 Regression Suite - Findings 8, 9: Mandatory modifier enforcement 
   assert.equal(isModifierGroupMandatory(groups[1]), false);
   assert.equal(
     getModifierGroupBadgeText(groups[0]),
-    "Bắt buộc (Chọn tối thiểu 1)"
+    "(Bắt buộc - Chọn tối thiểu 1)"
   );
   assert.equal(getModifierGroupBadgeText(groups[1]), null);
 

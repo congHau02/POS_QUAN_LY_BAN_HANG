@@ -145,11 +145,11 @@ test("validateModifierSelections enforces minSelections > 1 when specified", () 
 test("getModifierGroupBadgeText formats informative badge text for mandatory and optional groups", () => {
   assert.equal(
     getModifierGroupBadgeText({ minSelections: 1 }),
-    "Bắt buộc (Chọn tối thiểu 1)"
+    "(Bắt buộc - Chọn tối thiểu 1)"
   );
   assert.equal(
     getModifierGroupBadgeText({ minSelections: 2 }),
-    "Bắt buộc (Chọn tối thiểu 2)"
+    "(Bắt buộc - Chọn tối thiểu 2)"
   );
   assert.equal(getModifierGroupBadgeText({ minSelections: 0 }), null);
   assert.equal(getModifierGroupBadgeText({}), null);

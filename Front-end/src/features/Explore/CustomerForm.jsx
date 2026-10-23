@@ -28,7 +28,9 @@ function CustomerForm({
   // Derive verified customer state aligned with current input
   const normalizedPhone = normalizePhoneNumber(phone);
   const effectiveCustomerInfo =
-    customerInfo && customerInfo.phoneNumber === normalizedPhone
+    customerInfo &&
+    customerInfo.phoneNumber === normalizedPhone &&
+    customer?.customerId === customerInfo.customerId
       ? customerInfo
       : null;
   const effectiveIsNewCustomer =

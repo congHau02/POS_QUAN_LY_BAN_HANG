@@ -119,5 +119,5 @@ export function getModifierGroupBadgeText(group) {
     return null;
   }
   const min = Number(group.minSelections);
-  return `Bắt buộc (Chọn tối thiểu ${min})`;
+  return `(Bắt buộc - Chọn tối thiểu ${min})`;
 }
