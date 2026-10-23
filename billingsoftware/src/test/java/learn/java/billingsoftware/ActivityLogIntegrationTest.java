@@ -5,12 +5,15 @@ import learn.java.billingsoftware.entity.DiscountType;
 import learn.java.billingsoftware.entity.PromotionType;
 import learn.java.billingsoftware.io.*;
 import learn.java.billingsoftware.repository.ActivityLogRepository;
+import learn.java.billingsoftware.service.FileUploadService;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
+import org.springframework.mock.web.MockMultipartFile;
+import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Propagation;
@@ -21,6 +24,8 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.*;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
@@ -40,6 +45,9 @@ public class ActivityLogIntegrationTest {
 
     @Autowired
     private ActivityLogRepository activityLogRepository;
+
+    @MockitoBean
+    private FileUploadService fileUploadService;
 
     private final ObjectMapper objectMapper = new ObjectMapper().findAndRegisterModules();
 
@@ -146,6 +154,8 @@ public class ActivityLogIntegrationTest {
     @Test
     @DisplayName("Creating a Category triggers non-blocking audit activity log generation")
     void testCategoryCreationGeneratesActivityLog() throws Exception {
+        when(fileUploadService.uploadFile(any())).thenReturn("https://test-s3.com/audit-category.png");
+
         String categoryName = "Audit Category " + UUID.randomUUID().toString().substring(0, 6);
         CategoryRequest categoryRequest = CategoryRequest.builder()
                 .name(categoryName)
@@ -153,11 +163,17 @@ public class ActivityLogIntegrationTest {
                 .description("Category for audit logging verification")
                 .build();
 
+        MockMultipartFile categoryPart = new MockMultipartFile(
+                "category", "", "application/json",
+                objectMapper.writeValueAsString(categoryRequest).getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        MockMultipartFile filePart = new MockMultipartFile(
+                "file", "cat.png", "image/png", "fake".getBytes(java.nio.charset.StandardCharsets.UTF_8));
+
         // 1. Perform category creation
-        mockMvc.perform(post("/categories")
-                        .with(user("admin@billing.com").roles("ADMIN"))
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(objectMapper.writeValueAsString(categoryRequest)))
+        mockMvc.perform(multipart("/admin/categories")
+                        .file(categoryPart)
+                        .file(filePart)
+                        .with(user("admin@billing.com").roles("ADMIN")))
                 .andExpect(status().isCreated());
 
         // 2. Query activity logs to observe that the mutation was recorded

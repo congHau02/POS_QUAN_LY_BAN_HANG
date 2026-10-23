@@ -72,27 +72,28 @@ public class ItemUpdateIntegrationTest {
 
         categoryA = categoryRepository.save(CategoryEntity.builder()
                 .categoryId("cat-a-" + UUID.randomUUID().toString().substring(0, 6))
-                .name("Cat A")
+                .name("Cat A " + UUID.randomUUID().toString().substring(0, 6))
                 .description("Category A")
                 .bgColor("#111111")
                 .build());
 
         categoryB = categoryRepository.save(CategoryEntity.builder()
                 .categoryId("cat-b-" + UUID.randomUUID().toString().substring(0, 6))
-                .name("Cat B")
+                .name("Cat B " + UUID.randomUUID().toString().substring(0, 6))
                 .description("Category B")
                 .bgColor("#222222")
                 .build());
 
         modGroup = modifierGroupRepository.save(ModifierGroupEntity.builder()
                 .groupId("mod-grp-" + UUID.randomUUID().toString().substring(0, 6))
-                .name("Sugar Level")
+                .name("Sugar Level " + UUID.randomUUID().toString().substring(0, 6))
                 .minSelections(0)
                 .maxSelections(1)
                 .build());
     }
 
     @Test
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     @DisplayName("Admin can update item via JSON PUT, modifies fields, variants, modifier groups and emits UPDATE activity log")
     void testUpdateItemJson() throws Exception {
         String sku1 = "SKU-T1-" + UUID.randomUUID().toString().substring(0, 6);
@@ -148,7 +149,7 @@ public class ItemUpdateIntegrationTest {
                 .andExpect(jsonPath("$.name").value("Matcha Latte Special"))
                 .andExpect(jsonPath("$.description").value("Premium Uji Matcha"))
                 .andExpect(jsonPath("$.categoryId").value(categoryB.getCategoryId()))
-                .andExpect(jsonPath("$.categoryName").value("Cat B"))
+                .andExpect(jsonPath("$.categoryName").value(categoryB.getName()))
                 .andExpect(jsonPath("$.variants.length()").value(2))
                 .andExpect(jsonPath("$.modifierGroups.length()").value(1));
 

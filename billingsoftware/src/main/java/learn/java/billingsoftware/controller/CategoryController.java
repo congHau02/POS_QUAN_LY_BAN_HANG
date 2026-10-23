@@ -25,7 +25,7 @@ public class CategoryController {
     @PostMapping("/admin/categories")
     @ResponseStatus(HttpStatus.CREATED)
     public CategoryResponse addCategory(@RequestPart("category") String categoryString,
-                                        @RequestPart("file")MultipartFile file) {
+                                        @RequestPart("file") MultipartFile file) {
         CategoryRequest request = null;
         try {
             request = objectMapper.readValue(categoryString, CategoryRequest.class);
@@ -57,12 +57,6 @@ public class CategoryController {
         } catch (IOException e) {
             throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, e.getMessage());
         }
-    }
-
-    @PostMapping("/categories")
-    @ResponseStatus(HttpStatus.CREATED)
-    public CategoryResponse createCategory(@RequestBody CategoryRequest request) {
-        return categoryService.create(request);
     }
 
     @GetMapping("/categories")
