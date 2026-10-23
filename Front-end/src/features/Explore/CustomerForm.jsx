@@ -1,6 +1,11 @@
-import { useState, memo } from "react";
+import { useState, useEffect, memo } from "react";
 import { fetchCustomerByPhone, createCustomer } from "../../services/CustomerService";
 import { formatCurrency } from "../../utils/formatCurrency";
+import {
+  shouldTriggerCrmLookup,
+  getNextCustomerOnPhoneChange,
+  getNextCustomerOnNameChange,
+} from "../../utils/customerSync";
 import toast from "react-hot-toast";
 import Spinner from "../../ui/Spinner";
 import { Search, Star, UserPlus } from "lucide-react";
@@ -9,36 +14,92 @@ function CustomerForm({
   customer,
   onCustomerChange,
 }) {
-  const currentName = customer?.customerName ?? "";
-  const currentPhone = customer?.mobileNumber ?? "";
+  const phone = customer?.mobileNumber ?? "";
+  const name = customer?.customerName ?? "";
 
-  const [phone, setPhone] = useState(currentPhone);
-  const [name, setName] = useState(currentName);
   const [isSearching, setIsSearching] = useState(false);
   const [customerInfo, setCustomerInfo] = useState(null);
   const [isNewCustomer, setIsNewCustomer] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Sync from external when cleared or updated (e.g. cart clear)
-  const [prevCustomerSync, setPrevCustomerSync] = useState({ currentPhone, currentName });
-  if (prevCustomerSync.currentPhone !== currentPhone || prevCustomerSync.currentName !== currentName) {
-    setPrevCustomerSync({ currentPhone, currentName });
-    setPhone(currentPhone);
-    setName(currentName);
-    if (!currentPhone && !currentName) {
-      setCustomerInfo(null);
-      setIsNewCustomer(false);
-    }
-  }
+  // Derive verified customer state aligned with current input
+  const normalizedPhone = phone.trim().replace(/\s+/g, "");
+  const effectiveCustomerInfo =
+    customerInfo && customerInfo.phoneNumber === normalizedPhone
+      ? customerInfo
+      : null;
+  const effectiveIsNewCustomer =
+    normalizedPhone.length >= 8 && isNewCustomer && !effectiveCustomerInfo;
 
-  const syncToParent = (updated) => {
+  // Background debounced CRM lookup when at least 8 digits are entered
+  useEffect(() => {
+    const phoneToSearch = (customer?.mobileNumber || "").trim().replace(/\s+/g, "");
+
+    if (phoneToSearch.length < 8) {
+      return;
+    }
+
+    if (!shouldTriggerCrmLookup(phoneToSearch, customerInfo?.phoneNumber)) {
+      return;
+    }
+
+    let isCancelled = false;
+    const timer = setTimeout(async () => {
+      try {
+        setIsSearching(true);
+        const data = await fetchCustomerByPhone(phoneToSearch);
+        if (isCancelled) return;
+        if (data) {
+          setCustomerInfo(data);
+          setIsNewCustomer(false);
+          onCustomerChange?.({
+            customerId: data.customerId,
+            customerName: data.name,
+            mobileNumber: data.phoneNumber,
+          });
+          toast.success(`Đã tìm thấy khách hàng: ${data.name}`);
+        }
+      } catch (err) {
+        if (isCancelled) return;
+        if (err.response?.status === 404) {
+          setCustomerInfo(null);
+          setIsNewCustomer(true);
+          onCustomerChange?.({
+            customerId: null,
+            customerName: customer?.customerName ?? "",
+            mobileNumber: phoneToSearch,
+          });
+        }
+      } finally {
+        if (!isCancelled) {
+          setIsSearching(false);
+        }
+      }
+    }, 400);
+
+    return () => {
+      isCancelled = true;
+      clearTimeout(timer);
+    };
+  }, [customer?.mobileNumber, customer?.customerName, customerInfo?.phoneNumber, onCustomerChange]);
+
+  const handlePhoneChange = (newPhone) => {
+    setCustomerInfo(null);
+    setIsNewCustomer(false);
     if (onCustomerChange) {
-      onCustomerChange(updated);
+      onCustomerChange(getNextCustomerOnPhoneChange(customer || {}, newPhone));
     }
   };
 
-  async function handlePhoneSearch(phoneToSearch) {
-    const searchTarget = (phoneToSearch || phone).trim();
+  const handleNameChange = (newName) => {
+    if (onCustomerChange) {
+      onCustomerChange(getNextCustomerOnNameChange(customer || {}, newName));
+    }
+  };
+
+  async function handlePhoneSearch(overridePhone) {
+    const rawTarget = overridePhone || customer?.mobileNumber || "";
+    const searchTarget = rawTarget.trim().replace(/\s+/g, "");
     if (!searchTarget || searchTarget.length < 8) return;
 
     try {
@@ -46,10 +107,8 @@ function CustomerForm({
       const data = await fetchCustomerByPhone(searchTarget);
       if (data) {
         setCustomerInfo(data);
-        setName(data.name);
-        setPhone(data.phoneNumber);
         setIsNewCustomer(false);
-        syncToParent({
+        onCustomerChange?.({
           customerId: data.customerId,
           customerName: data.name,
           mobileNumber: data.phoneNumber,
@@ -60,9 +119,9 @@ function CustomerForm({
       if (err.response?.status === 404) {
         setCustomerInfo(null);
         setIsNewCustomer(true);
-        syncToParent({
+        onCustomerChange?.({
           customerId: null,
-          customerName: name,
+          customerName: customer?.customerName ?? "",
           mobileNumber: searchTarget,
         });
       }
@@ -72,11 +131,14 @@ function CustomerForm({
   }
 
   async function handleQuickSaveCustomer() {
-    if (!name.trim()) {
+    const currentName = (customer?.customerName || "").trim();
+    const currentPhone = (customer?.mobileNumber || "").trim();
+
+    if (!currentName) {
       toast.error("Vui lòng nhập tên khách hàng");
       return;
     }
-    if (!phone.trim()) {
+    if (!currentPhone) {
       toast.error("Vui lòng nhập số điện thoại");
       return;
     }
@@ -84,12 +146,12 @@ function CustomerForm({
     try {
       setIsSaving(true);
       const newCustomer = await createCustomer({
-        name: name.trim(),
-        phoneNumber: phone.trim(),
+        name: currentName,
+        phoneNumber: currentPhone,
       });
       setCustomerInfo(newCustomer);
       setIsNewCustomer(false);
-      syncToParent({
+      onCustomerChange?.({
         customerId: newCustomer.customerId,
         customerName: newCustomer.name,
         mobileNumber: newCustomer.phoneNumber,
@@ -112,18 +174,7 @@ function CustomerForm({
             id="mobileNumber"
             placeholder="Số điện thoại..."
             value={phone}
-            onChange={(e) => {
-              setPhone(e.target.value);
-              setCustomerInfo(null);
-              setIsNewCustomer(false);
-            }}
-            onBlur={() => {
-              syncToParent({
-                customerId: customerInfo?.customerId || null,
-                customerName: name,
-                mobileNumber: phone,
-              });
-            }}
+            onChange={(e) => handlePhoneChange(e.target.value)}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
@@ -151,31 +202,12 @@ function CustomerForm({
           id="customerName"
           placeholder="Tên khách hàng..."
           value={name}
-          onChange={(e) => {
-            setName(e.target.value);
-          }}
-          onBlur={() => {
-            syncToParent({
-              customerId: customerInfo?.customerId || null,
-              customerName: name,
-              mobileNumber: phone,
-            });
-          }}
-          onKeyDown={(e) => {
-            if (e.key === "Enter") {
-              e.preventDefault();
-              syncToParent({
-                customerId: customerInfo?.customerId || null,
-                customerName: name,
-                mobileNumber: phone,
-              });
-            }
-          }}
+          onChange={(e) => handleNameChange(e.target.value)}
           className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
         />
       </div>
 
-      {customerInfo && (
+      {effectiveCustomerInfo && (
         <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs flex justify-between items-center">
           <div>
             <div className="inline-flex items-center gap-1 font-semibold text-emerald-900">
@@ -183,7 +215,7 @@ function CustomerForm({
               <span>Khách hàng cũ</span>
             </div>
             <div className="text-[11px] text-emerald-700">
-              {customerInfo.orderCount} đơn hàng • {formatCurrency(customerInfo.totalSpent || 0)}
+              {effectiveCustomerInfo.orderCount} đơn hàng • {formatCurrency(effectiveCustomerInfo.totalSpent || 0)}
             </div>
           </div>
           <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-emerald-200 text-emerald-900">
@@ -192,7 +224,7 @@ function CustomerForm({
         </div>
       )}
 
-      {isNewCustomer && (
+      {effectiveIsNewCustomer && (
         <div className="p-2 rounded-lg bg-amber-50 border border-amber-200 text-xs flex justify-between items-center">
           <div className="text-amber-800 text-[11px]">
             Khách hàng mới chưa có trong CRM.
@@ -213,4 +245,3 @@ function CustomerForm({
 }
 
 export default memo(CustomerForm);
-

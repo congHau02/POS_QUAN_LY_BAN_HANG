@@ -14,6 +14,7 @@ import {
 } from "../Promotions/usePromotionEvaluation";
 import { useCartCalculations } from "./useCartCalculations";
 import { getPromotionErrorMessage } from "../../utils/promotionErrorMessages";
+import { buildCustomerOrderPayload } from "../../utils/customerSync";
 import { Tag, Banknote, CreditCard, X } from "lucide-react";
 
 function CartSummary({
@@ -24,10 +25,6 @@ function CartSummary({
 }) {
   const queryClient = useQueryClient();
   const { isCreating, createOrder, orderData } = useCreateOrder();
-
-  const customerName = customer?.customerName || "";
-  const mobileNumber = customer?.mobileNumber || "";
-  const customerId = customer?.customerId || null;
 
   const [showModal, setShowModal] = useState(false);
   const [completedCashOrder, setCompletedCashOrder] = useState(null);
@@ -105,11 +102,10 @@ function CartSummary({
 
   function onCreateOrder(paymentMode) {
     const formattedCartItems = formatCartItems(cartItems);
+    const customerPayload = buildCustomerOrderPayload(customer);
 
     const dataForm = {
-      customerId: customerId || null,
-      customerName: customerName.trim() || "Người dùng mặc định",
-      phoneNumber: mobileNumber.trim() || "0000000000",
+      ...customerPayload,
       cartItems: formattedCartItems,
       subtotal,
       discountAmount,
