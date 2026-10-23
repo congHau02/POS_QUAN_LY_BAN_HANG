@@ -18,10 +18,10 @@ public interface OrderEntityRepository extends JpaRepository<OrderEntity, Long> 
 
     List<OrderEntity> findAllByOrderByCreatedAtDesc();
 
-    @Query("SELECT SUM(o.grandTotal) FROM OrderEntity o WHERE o.createdAt >= :startDate AND o.createdAt < :endDate")
+    @Query("SELECT SUM(o.grandTotal) FROM OrderEntity o WHERE o.createdAt >= :startDate AND o.createdAt < :endDate AND o.paymentDetails.status = learn.java.billingsoftware.io.PaymentDetails.PaymentStatus.COMPLETED")
     Double sumSalesBetween(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
-    @Query("SELECT COUNT(o) FROM OrderEntity o WHERE o.createdAt >= :startDate AND o.createdAt < :endDate")
+    @Query("SELECT COUNT(o) FROM OrderEntity o WHERE o.createdAt >= :startDate AND o.createdAt < :endDate AND o.paymentDetails.status = learn.java.billingsoftware.io.PaymentDetails.PaymentStatus.COMPLETED")
     Long countOrdersBetween(@Param("startDate") LocalDateTime startDate, @Param("endDate") LocalDateTime endDate);
 
     default Double sumSalesByDate(LocalDate date) {

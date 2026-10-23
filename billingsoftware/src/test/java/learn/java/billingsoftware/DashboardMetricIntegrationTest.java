@@ -71,16 +71,19 @@ public class DashboardMetricIntegrationTest {
                 .andExpect(jsonPath("$.todaySales", notNullValue()));
     }
 
+    private DashboarResponse fetchDashboardResponse(String username, String role) throws Exception {
+        String content = mockMvc.perform(get("/dashboard")
+                        .with(user(username).roles(role)))
+                .andExpect(status().isOk())
+                .andReturn().getResponse().getContentAsString();
+        return objectMapper.readValue(content, DashboarResponse.class);
+    }
+
     @Test
     @DisplayName("todayOrderCount and todaySales dynamically update when new orders are placed today")
     void testTodayOrderCountAccuracyWithNewOrders() throws Exception {
         // 1. Fetch initial baseline dashboard metrics
-        String initialContent = mockMvc.perform(get("/dashboard")
-                        .with(user("staff@example.com").roles("USER")))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-
-        DashboarResponse initialResponse = objectMapper.readValue(initialContent, DashboarResponse.class);
+        DashboarResponse initialResponse = fetchDashboardResponse("staff@example.com", "USER");
         long initialCount = initialResponse.getTodayOrderCount() != null ? initialResponse.getTodayOrderCount() : 0L;
         double initialSales = initialResponse.getTodaySales() != null ? initialResponse.getTodaySales() : 0.0;
 
@@ -103,12 +106,7 @@ public class DashboardMetricIntegrationTest {
         orderEntityRepository.saveAndFlush(order);
 
         // 3. Re-query dashboard and assert that todayOrderCount incremented by 1 and todaySales increased
-        String updatedContent = mockMvc.perform(get("/dashboard")
-                        .with(user("staff@example.com").roles("USER")))
-                .andExpect(status().isOk())
-                .andReturn().getResponse().getContentAsString();
-
-        DashboarResponse updatedResponse = objectMapper.readValue(updatedContent, DashboarResponse.class);
+        DashboarResponse updatedResponse = fetchDashboardResponse("staff@example.com", "USER");
         assertNotNull(updatedResponse);
         assertEquals(initialCount + 1, updatedResponse.getTodayOrderCount());
         assertEquals(initialSales + orderAmount, updatedResponse.getTodaySales(), 0.01);
@@ -146,5 +144,86 @@ public class DashboardMetricIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.todayOrderCount", greaterThanOrEqualTo(0)))
                 .andExpect(jsonPath("$.todaySales", greaterThanOrEqualTo(0.0)));
+    }
+
+    @Test
+    @DisplayName("Dashboard todaySales and todayOrderCount strictly include COMPLETED orders and exclude PENDING, CANCELLED, and FAILED")
+    void testDashboardMetricsExcludeNonCompletedOrders() throws Exception {
+        // 1. Fetch baseline
+        DashboarResponse initialResponse = fetchDashboardResponse("staff@example.com", "USER");
+        long initialCount = initialResponse.getTodayOrderCount() != null ? initialResponse.getTodayOrderCount() : 0L;
+        double initialSales = initialResponse.getTodaySales() != null ? initialResponse.getTodaySales() : 0.0;
+
+        // 2. Persist non-COMPLETED orders today
+        OrderEntity pendingOrder = OrderEntity.builder()
+                .orderId("ORD-PENDING-" + UUID.randomUUID().toString().substring(0, 8))
+                .customerName("Pending Customer")
+                .grandTotal(50000.0)
+                .paymentMethod(PaymentMethod.PAYOS)
+                .paymentDetails(PaymentDetails.builder().status(PaymentDetails.PaymentStatus.PENDING).build())
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        OrderEntity cancelledOrder = OrderEntity.builder()
+                .orderId("ORD-CANCELLED-" + UUID.randomUUID().toString().substring(0, 8))
+                .customerName("Cancelled Customer")
+                .grandTotal(75000.0)
+                .paymentMethod(PaymentMethod.PAYOS)
+                .paymentDetails(PaymentDetails.builder().status(PaymentDetails.PaymentStatus.CANCELLED).build())
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        OrderEntity failedOrder = OrderEntity.builder()
+                .orderId("ORD-FAILED-" + UUID.randomUUID().toString().substring(0, 8))
+                .customerName("Failed Customer")
+                .grandTotal(60000.0)
+                .paymentMethod(PaymentMethod.PAYOS)
+                .paymentDetails(PaymentDetails.builder().status(PaymentDetails.PaymentStatus.FAILED).build())
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        // Out-of-bounds orders (yesterday and tomorrow) with COMPLETED status
+        OrderEntity yesterdayCompleted = OrderEntity.builder()
+                .orderId("ORD-YESTERDAY-" + UUID.randomUUID().toString().substring(0, 8))
+                .customerName("Yesterday Customer")
+                .grandTotal(200000.0)
+                .paymentMethod(PaymentMethod.CASH)
+                .paymentDetails(PaymentDetails.builder().status(PaymentDetails.PaymentStatus.COMPLETED).build())
+                .createdAt(LocalDateTime.now().minusDays(1))
+                .build();
+
+        OrderEntity tomorrowCompleted = OrderEntity.builder()
+                .orderId("ORD-TOMORROW-" + UUID.randomUUID().toString().substring(0, 8))
+                .customerName("Tomorrow Customer")
+                .grandTotal(300000.0)
+                .paymentMethod(PaymentMethod.CASH)
+                .paymentDetails(PaymentDetails.builder().status(PaymentDetails.PaymentStatus.COMPLETED).build())
+                .createdAt(LocalDateTime.now().plusDays(1))
+                .build();
+
+        // 1 COMPLETED order today
+        Double completedAmount = 120000.0;
+        OrderEntity todayCompleted = OrderEntity.builder()
+                .orderId("ORD-COMPLETED-" + UUID.randomUUID().toString().substring(0, 8))
+                .customerName("Completed Customer")
+                .grandTotal(completedAmount)
+                .paymentMethod(PaymentMethod.CASH)
+                .paymentDetails(PaymentDetails.builder().status(PaymentDetails.PaymentStatus.COMPLETED).build())
+                .createdAt(LocalDateTime.now())
+                .build();
+
+        orderEntityRepository.save(pendingOrder);
+        orderEntityRepository.save(cancelledOrder);
+        orderEntityRepository.save(failedOrder);
+        orderEntityRepository.save(yesterdayCompleted);
+        orderEntityRepository.save(tomorrowCompleted);
+        orderEntityRepository.save(todayCompleted);
+        orderEntityRepository.flush();
+
+        // 3. Verify metrics strictly reflect only todayCompleted
+        DashboarResponse updatedResponse = fetchDashboardResponse("staff@example.com", "USER");
+        assertNotNull(updatedResponse);
+        assertEquals(initialCount + 1, updatedResponse.getTodayOrderCount());
+        assertEquals(initialSales + completedAmount, updatedResponse.getTodaySales(), 0.01);
     }
 }
