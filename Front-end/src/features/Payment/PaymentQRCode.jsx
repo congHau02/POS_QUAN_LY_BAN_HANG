@@ -5,6 +5,7 @@ import { useOrderLifecycle } from "../Orders/useOrderLifecycle";
 import CompletedPayment from "./CompletedPayment";
 import ConfirmDeleteModal from "../../ui/ConfirmDeleteModal";
 import QRCode from "./QRCode";
+import { getOrderStatus } from "./orderTerminalState";
 
 function PaymentQRCode({ orderData, onCancelSuccess, onSwitchToCashSuccess }) {
   const queryClient = useQueryClient();
@@ -17,7 +18,9 @@ function PaymentQRCode({ orderData, onCancelSuccess, onSwitchToCashSuccess }) {
 
   // 2. Hợp nhất dữ liệu mới nhất để render giao diện
   const currentData = polledOrderData?.data || polledOrderData || rawOrder;
-  const isFinalCompleted = currentData?.paymentDetails?.status === "COMPLETED";
+  const orderStatus = getOrderStatus(currentData);
+  const isFinalCompleted = orderStatus === "COMPLETED";
+  const isFinalCancelled = orderStatus === "CANCELLED";
 
   // 3. Sử dụng custom hook tập trung cho vòng đời đơn hàng
   const {
@@ -37,10 +40,10 @@ function PaymentQRCode({ orderData, onCancelSuccess, onSwitchToCashSuccess }) {
 
   // 4. Chỉ dùng useEffect cho Side-effect (Invalidate query bên ngoài), tuyệt đối không setState
   useEffect(() => {
-    if (isFinalCompleted) {
+    if (isFinalCompleted || isFinalCancelled) {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
     }
-  }, [isFinalCompleted, queryClient]);
+  }, [isFinalCompleted, isFinalCancelled, queryClient]);
 
   // Bảo vệ an toàn
   if (!currentData || currentData.paymentMethod !== "PAYOS") {

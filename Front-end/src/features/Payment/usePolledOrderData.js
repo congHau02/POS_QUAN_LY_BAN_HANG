@@ -1,19 +1,29 @@
 import { useQuery } from "@tanstack/react-query";
 import { getOrderById } from "../../services/OrderService";
+import {
+  isTerminalOrderStatus,
+  getOrderStatus,
+  computePollingInterval,
+  isPollingEnabled,
+} from "./orderTerminalState";
+
+export {
+  isTerminalOrderStatus,
+  getOrderStatus,
+  computePollingInterval,
+  isPollingEnabled,
+};
 
 export function usePolledOrderData(baseData, orderId) {
-  const initial = baseData?.data || baseData;
-  const isInitiallyCompleted = initial?.paymentDetails?.status === "COMPLETED";
+  const isEnabled = isPollingEnabled(orderId, baseData);
 
   const { data: polledOrderData } = useQuery({
     queryKey: ["order", orderId],
     queryFn: () => getOrderById(orderId),
     initialData: baseData || undefined,
-    enabled: Boolean(orderId) && !isInitiallyCompleted,
+    enabled: isEnabled,
     refetchInterval: (query) => {
-      const current = query?.state?.data;
-      const resolved = current?.data || current;
-      return resolved?.paymentDetails?.status === "COMPLETED" ? false : 3000;
+      return computePollingInterval(query);
     },
   });
 

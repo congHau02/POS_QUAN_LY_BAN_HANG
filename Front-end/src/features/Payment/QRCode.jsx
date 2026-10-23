@@ -2,6 +2,7 @@ import { QRCodeSVG } from "qrcode.react";
 import { formatCurrency } from "../../utils/formatCurrency";
 import Spinner from "../../ui/Spinner";
 import { ExternalLink, Banknote, Ban } from "lucide-react";
+import { getOrderStatus } from "./orderTerminalState";
 
 function QRCode({
   currentData,
@@ -17,13 +18,32 @@ function QRCode({
   const checkoutUrl =
     currentData.paymentDetails?.checkoutUrl || currentData.checkoutUrl;
 
+  const status = getOrderStatus(currentData);
+  const isCancelled = status === "CANCELLED";
+
   return (
     <div className="mt-3 p-5 border border-slate-200 bg-slate-50/70 rounded-2xl text-center shadow-xs">
-      <h5 className="text-base font-bold text-slate-900 mb-3">
-        Quét mã QR để thanh toán (PayOS)
+      <h5
+        className={`text-base font-bold mb-3 ${
+          isCancelled ? "text-red-600" : "text-slate-900"
+        }`}
+      >
+        {isCancelled ? "Đơn hàng đã bị hủy" : "Quét mã QR để thanh toán (PayOS)"}
       </h5>
 
-      {currentData.paymentDetails?.qrCode ? (
+      {isCancelled ? (
+        <div className="my-4 p-5 rounded-xl border border-red-200 bg-red-50 text-center flex flex-col items-center justify-center space-y-2">
+          <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+            <Ban size={24} />
+          </div>
+          <h4 className="text-sm font-bold text-red-800">
+            Đơn hàng này đã bị hủy
+          </h4>
+          <p className="text-xs text-red-600 max-w-xs">
+            Đơn hàng đã bị hủy bỏ và tồn kho đã được hoàn lại. Không thể tiếp tục thanh toán cho đơn hàng này.
+          </p>
+        </div>
+      ) : currentData.paymentDetails?.qrCode ? (
         <div className="flex justify-center mb-4">
           <div className="p-3 bg-white rounded-xl shadow-xs inline-block border border-slate-200">
             <QRCodeSVG
@@ -85,46 +105,50 @@ function QRCode({
         )}
 
         <p className="text-[11px] text-slate-400 mt-2 text-center">
-          * Đơn hàng sẽ tự động cập nhật trạng thái ngay sau khi bạn chuyển khoản thành công.
+          {isCancelled
+            ? "* Đơn hàng đã bị hủy. Mọi giao dịch phát sinh sẽ không được xử lý."
+            : "* Đơn hàng sẽ tự động cập nhật trạng thái ngay sau khi bạn chuyển khoản thành công."}
         </p>
       </div>
 
       {/* In-Flight Action Controls */}
-      <div className="mt-4 max-w-sm mx-auto space-y-2">
-        {onSwitchToCash && (
-          <button
-            type="button"
-            onClick={onSwitchToCash}
-            disabled={isSwitchingToCash || isCancelling}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
-          >
-            {isSwitchingToCash ? (
-              <Spinner size={14} className="text-white" />
-            ) : (
-              <Banknote size={15} />
-            )}
-            <span>Chuyển sang tiền mặt</span>
-          </button>
-        )}
+      {!isCancelled && (
+        <div className="mt-4 max-w-sm mx-auto space-y-2">
+          {onSwitchToCash && (
+            <button
+              type="button"
+              onClick={onSwitchToCash}
+              disabled={isSwitchingToCash || isCancelling}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              {isSwitchingToCash ? (
+                <Spinner size={14} className="text-white" />
+              ) : (
+                <Banknote size={15} />
+              )}
+              <span>Chuyển sang tiền mặt</span>
+            </button>
+          )}
 
-        {onCancelOrder && (
-          <button
-            type="button"
-            onClick={onCancelOrder}
-            disabled={isSwitchingToCash || isCancelling}
-            className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
-          >
-            {isCancelling ? (
-              <Spinner size={14} className="text-red-600" />
-            ) : (
-              <Ban size={14} />
-            )}
-            <span>Hủy đơn hàng</span>
-          </button>
-        )}
-      </div>
+          {onCancelOrder && (
+            <button
+              type="button"
+              onClick={onCancelOrder}
+              disabled={isSwitchingToCash || isCancelling}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-600 text-xs font-semibold transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              {isCancelling ? (
+                <Spinner size={14} className="text-red-600" />
+              ) : (
+                <Ban size={14} />
+              )}
+              <span>Hủy đơn hàng</span>
+            </button>
+          )}
+        </div>
+      )}
 
-      {checkoutUrl && (
+      {!isCancelled && checkoutUrl && (
         <a
           href={checkoutUrl}
           target="_blank"
