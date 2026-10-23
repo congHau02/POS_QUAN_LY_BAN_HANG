@@ -1,14 +1,15 @@
-import { useState, useEffect, memo } from "react";
+import { useState, useEffect, useRef, useCallback, memo } from "react";
 import { fetchCustomerByPhone, createCustomer } from "../../services/CustomerService";
 import { formatCurrency } from "../../utils/formatCurrency";
 import {
+  normalizePhoneNumber,
   shouldTriggerCrmLookup,
   getNextCustomerOnPhoneChange,
   getNextCustomerOnNameChange,
 } from "../../utils/customerSync";
 import toast from "react-hot-toast";
 import Spinner from "../../ui/Spinner";
-import { Search, Star, UserPlus } from "lucide-react";
+import { Search, Star, UserPlus, X } from "lucide-react";
 
 function CustomerForm({
   customer,
@@ -22,8 +23,10 @@ function CustomerForm({
   const [isNewCustomer, setIsNewCustomer] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
 
+  const lastSearchedPhoneRef = useRef("");
+
   // Derive verified customer state aligned with current input
-  const normalizedPhone = phone.trim().replace(/\s+/g, "");
+  const normalizedPhone = normalizePhoneNumber(phone);
   const effectiveCustomerInfo =
     customerInfo && customerInfo.phoneNumber === normalizedPhone
       ? customerInfo
@@ -31,24 +34,14 @@ function CustomerForm({
   const effectiveIsNewCustomer =
     normalizedPhone.length >= 8 && isNewCustomer && !effectiveCustomerInfo;
 
-  // Background debounced CRM lookup when at least 8 digits are entered
-  useEffect(() => {
-    const phoneToSearch = (customer?.mobileNumber || "").trim().replace(/\s+/g, "");
+  const performCustomerLookup = useCallback(
+    async (targetPhone) => {
+      if (!targetPhone || targetPhone.length < 8) return;
 
-    if (phoneToSearch.length < 8) {
-      return;
-    }
-
-    if (!shouldTriggerCrmLookup(phoneToSearch, customerInfo?.phoneNumber)) {
-      return;
-    }
-
-    let isCancelled = false;
-    const timer = setTimeout(async () => {
       try {
         setIsSearching(true);
-        const data = await fetchCustomerByPhone(phoneToSearch);
-        if (isCancelled) return;
+        lastSearchedPhoneRef.current = targetPhone;
+        const data = await fetchCustomerByPhone(targetPhone);
         if (data) {
           setCustomerInfo(data);
           setIsNewCustomer(false);
@@ -60,20 +53,38 @@ function CustomerForm({
           toast.success(`Đã tìm thấy khách hàng: ${data.name}`);
         }
       } catch (err) {
-        if (isCancelled) return;
         if (err.response?.status === 404) {
           setCustomerInfo(null);
           setIsNewCustomer(true);
-          onCustomerChange?.({
-            customerId: null,
-            customerName: customer?.customerName ?? "",
-            mobileNumber: phoneToSearch,
-          });
         }
       } finally {
-        if (!isCancelled) {
-          setIsSearching(false);
-        }
+        setIsSearching(false);
+      }
+    },
+    [onCustomerChange]
+  );
+
+  // Background debounced CRM lookup when at least 8 digits are entered
+  useEffect(() => {
+    const phoneToSearch = normalizePhoneNumber(customer?.mobileNumber || "");
+
+    if (phoneToSearch.length < 8) {
+      lastSearchedPhoneRef.current = "";
+      return;
+    }
+
+    if (lastSearchedPhoneRef.current === phoneToSearch) {
+      return;
+    }
+
+    if (!shouldTriggerCrmLookup(phoneToSearch, customerInfo?.phoneNumber)) {
+      return;
+    }
+
+    let isCancelled = false;
+    const timer = setTimeout(() => {
+      if (!isCancelled) {
+        performCustomerLookup(phoneToSearch);
       }
     }, 400);
 
@@ -81,7 +92,7 @@ function CustomerForm({
       isCancelled = true;
       clearTimeout(timer);
     };
-  }, [customer?.mobileNumber, customer?.customerName, customerInfo?.phoneNumber, onCustomerChange]);
+  }, [customer?.mobileNumber, customerInfo?.phoneNumber, performCustomerLookup]);
 
   const handlePhoneChange = (newPhone) => {
     setCustomerInfo(null);
@@ -97,38 +108,18 @@ function CustomerForm({
     }
   };
 
-  async function handlePhoneSearch(overridePhone) {
-    const rawTarget = overridePhone || customer?.mobileNumber || "";
-    const searchTarget = rawTarget.trim().replace(/\s+/g, "");
-    if (!searchTarget || searchTarget.length < 8) return;
-
-    try {
-      setIsSearching(true);
-      const data = await fetchCustomerByPhone(searchTarget);
-      if (data) {
-        setCustomerInfo(data);
-        setIsNewCustomer(false);
-        onCustomerChange?.({
-          customerId: data.customerId,
-          customerName: data.name,
-          mobileNumber: data.phoneNumber,
-        });
-        toast.success(`Đã tìm thấy khách hàng: ${data.name}`);
-      }
-    } catch (err) {
-      if (err.response?.status === 404) {
-        setCustomerInfo(null);
-        setIsNewCustomer(true);
-        onCustomerChange?.({
-          customerId: null,
-          customerName: customer?.customerName ?? "",
-          mobileNumber: searchTarget,
-        });
-      }
-    } finally {
-      setIsSearching(false);
+  const handleResetCustomer = () => {
+    setCustomerInfo(null);
+    setIsNewCustomer(false);
+    lastSearchedPhoneRef.current = "";
+    if (onCustomerChange) {
+      onCustomerChange({
+        customerId: null,
+        customerName: "",
+        mobileNumber: "",
+      });
     }
-  }
+  };
 
   async function handleQuickSaveCustomer() {
     const currentName = (customer?.customerName || "").trim();
@@ -164,6 +155,8 @@ function CustomerForm({
     }
   }
 
+  const hasCustomerData = Boolean(phone.trim() || name.trim());
+
   return (
     <div className="space-y-2">
       {/* Phone Number Input */}
@@ -178,20 +171,30 @@ function CustomerForm({
             onKeyDown={(e) => {
               if (e.key === "Enter") {
                 e.preventDefault();
-                handlePhoneSearch();
+                performCustomerLookup(normalizedPhone);
               }
             }}
             className="flex-1 rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
           />
           <button
             type="button"
-            onClick={() => handlePhoneSearch()}
-            disabled={isSearching || !phone.trim()}
+            onClick={() => performCustomerLookup(normalizedPhone)}
+            disabled={isSearching || !normalizedPhone}
             title="Tìm khách hàng"
             className="p-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-600 disabled:opacity-40 cursor-pointer"
           >
             {isSearching ? <Spinner size={14} /> : <Search size={14} />}
           </button>
+          {hasCustomerData && (
+            <button
+              type="button"
+              onClick={handleResetCustomer}
+              title="Xóa thông tin khách hàng"
+              className="p-1.5 rounded-lg border border-slate-300 hover:bg-slate-50 text-slate-400 hover:text-slate-600 cursor-pointer"
+            >
+              <X size={14} />
+            </button>
+          )}
         </div>
       </div>
 

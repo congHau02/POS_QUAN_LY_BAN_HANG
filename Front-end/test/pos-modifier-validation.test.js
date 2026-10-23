@@ -4,6 +4,7 @@ import {
   isModifierGroupMandatory,
   getModifierGroupSelectionCount,
   getUnmetModifierGroups,
+  getExceededModifierGroups,
   validateModifierSelections,
   getModifierGroupBadgeText,
 } from "../src/utils/modifierValidation.js";
@@ -40,6 +41,21 @@ test("getUnmetModifierGroups returns empty array when all required groups are sa
     "g-size": new Set(["m-1"]),
   });
   assert.deepEqual(unmet, []);
+});
+
+test("getExceededModifierGroups identifies groups with selections exceeding maxSelections", () => {
+  const groups = [
+    { groupId: "g-single", name: "Kích cỡ", maxSelections: 1 },
+    { groupId: "g-multi", name: "Topping", maxSelections: 2 },
+  ];
+
+  const exceeded = getExceededModifierGroups(groups, {
+    "g-single": new Set(["m-1", "m-2"]),
+    "g-multi": new Set(["t-1", "t-2"]),
+  });
+
+  assert.equal(exceeded.length, 1);
+  assert.equal(exceeded[0].groupId, "g-single");
 });
 
 test("validateModifierSelections returns valid when item has no modifier groups", () => {
@@ -94,6 +110,19 @@ test("validateModifierSelections blocks addition when mandatory group has unmet 
   assert.equal(resComplete.isValid, true);
   assert.deepEqual(resComplete.unmetGroups, []);
   assert.equal(resComplete.errorMessage, null);
+});
+
+test("validateModifierSelections blocks addition when selections exceed maxSelections", () => {
+  const groups = [
+    { groupId: "g-flavor", name: "Hương vị", minSelections: 1, maxSelections: 1 },
+  ];
+
+  const resExceeded = validateModifierSelections(groups, {
+    "g-flavor": new Set(["vanilla", "chocolate"]),
+  });
+
+  assert.equal(resExceeded.isValid, false);
+  assert.equal(resExceeded.errorMessage, "Vui lòng chọn tối đa 1 tùy chọn cho: Hương vị");
 });
 
 test("validateModifierSelections enforces minSelections > 1 when specified", () => {

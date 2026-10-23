@@ -4,6 +4,16 @@
  */
 
 /**
+ * Normalizes phone numbers by trimming whitespace and removing internal spaces.
+ * @param {string} phoneNumber - The raw phone number input
+ * @returns {string}
+ */
+export function normalizePhoneNumber(phoneNumber) {
+  if (typeof phoneNumber !== "string") return "";
+  return phoneNumber.trim().replace(/\s+/g, "");
+}
+
+/**
  * Builds customer fields for the create order request payload.
  * Fallbacks to default guest credentials when fields are empty or whitespace.
  * @param {object} customer - Customer object { customerId, customerName, mobileNumber }
@@ -30,7 +40,7 @@ export function buildCustomerOrderPayload(customer) {
  */
 export function shouldTriggerCrmLookup(phoneNumber, verifiedCustomerPhone) {
   if (!phoneNumber) return false;
-  const digits = phoneNumber.trim().replace(/\s+/g, "");
+  const digits = normalizePhoneNumber(phoneNumber);
   if (digits.length < 8) return false;
   if (verifiedCustomerPhone && verifiedCustomerPhone === digits) return false;
   return true;
@@ -53,6 +63,7 @@ export function getNextCustomerOnPhoneChange(currentCustomer, nextPhone) {
 
 /**
  * Computes next customer state when customer name changes during fast POS entry.
+ * Clears customerId when name is modified from the verified customer name to prevent mismatch.
  * @param {object} currentCustomer - Current customer state
  * @param {string} nextName - New customer name input value
  * @returns {object} Next customer state
@@ -60,6 +71,7 @@ export function getNextCustomerOnPhoneChange(currentCustomer, nextPhone) {
 export function getNextCustomerOnNameChange(currentCustomer, nextName) {
   return {
     ...currentCustomer,
+    customerId: null,
     customerName: nextName,
   };
 }

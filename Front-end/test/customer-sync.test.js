@@ -1,11 +1,18 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import {
+  normalizePhoneNumber,
   buildCustomerOrderPayload,
   shouldTriggerCrmLookup,
   getNextCustomerOnPhoneChange,
   getNextCustomerOnNameChange,
 } from "../src/utils/customerSync.js";
+
+test("normalizePhoneNumber trims and removes internal spaces", () => {
+  assert.equal(normalizePhoneNumber("  090 123 4567  "), "0901234567");
+  assert.equal(normalizePhoneNumber(""), "");
+  assert.equal(normalizePhoneNumber(null), "");
+});
 
 test("buildCustomerOrderPayload captures customer name and phone when provided", () => {
   const customer = {
@@ -74,7 +81,7 @@ test("getNextCustomerOnPhoneChange clears customerId and updates mobileNumber im
   assert.equal(next.customerName, "Tran Van C");
 });
 
-test("getNextCustomerOnNameChange updates customerName while retaining existing id and phone", () => {
+test("getNextCustomerOnNameChange updates customerName and clears customerId to prevent identity mismatch", () => {
   const current = {
     customerId: "cust-99",
     customerName: "Tran Van C",
@@ -82,7 +89,7 @@ test("getNextCustomerOnNameChange updates customerName while retaining existing 
   };
 
   const next = getNextCustomerOnNameChange(current, "Tran Van D");
-  assert.equal(next.customerId, "cust-99");
+  assert.equal(next.customerId, null);
   assert.equal(next.mobileNumber, "0901234567");
   assert.equal(next.customerName, "Tran Van D");
 });

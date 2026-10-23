@@ -14,8 +14,7 @@ export function isModifierGroupMandatory(group) {
 
 /**
  * Returns the count of selected modifiers for a specific group.
- * Supports Set, Array, or undefined.
- * @param {object} selectedModifiersMap - Map of groupId -> Set or Array
+ * @param {object} selectedModifiersMap - Map of groupId -> Set of modifier IDs
  * @param {string} groupId - The modifier group ID
  * @returns {number}
  */
@@ -25,7 +24,6 @@ export function getModifierGroupSelectionCount(selectedModifiersMap, groupId) {
   if (!selections) return 0;
   if (selections instanceof Set) return selections.size;
   if (Array.isArray(selections)) return selections.length;
-  if (typeof selections === "object") return Object.keys(selections).length;
   return 0;
 }
 
@@ -54,29 +52,59 @@ export function getUnmetModifierGroups(modifierGroups, selectedModifiersMap) {
 }
 
 /**
- * Validates modifier group selections for an item.
+ * Identifies modifier groups that exceed their maximum selection limits.
+ * @param {Array<object>} modifierGroups - List of modifier groups
+ * @param {object} selectedModifiersMap - Map of groupId -> Set of selected modifier IDs
+ * @returns {Array<object>} List of exceeded modifier groups
+ */
+export function getExceededModifierGroups(modifierGroups, selectedModifiersMap) {
+  if (!Array.isArray(modifierGroups) || modifierGroups.length === 0) {
+    return [];
+  }
+
+  return modifierGroups.filter((group) => {
+    if (!group?.maxSelections || group.maxSelections <= 0) {
+      return false;
+    }
+    const selectedCount = getModifierGroupSelectionCount(
+      selectedModifiersMap,
+      group.groupId
+    );
+    return selectedCount > Number(group.maxSelections);
+  });
+}
+
+/**
+ * Validates modifier group selections for an item against both minSelections and maxSelections boundaries.
  * @param {Array<object>} modifierGroups - List of modifier groups
  * @param {object} selectedModifiersMap - Map of groupId -> Set of selected modifier IDs
  * @returns {{ isValid: boolean, unmetGroups: Array<object>, errorMessage: string | null }}
  */
 export function validateModifierSelections(modifierGroups, selectedModifiersMap) {
   const unmetGroups = getUnmetModifierGroups(modifierGroups, selectedModifiersMap);
-
-  if (unmetGroups.length === 0) {
+  if (unmetGroups.length > 0) {
+    const firstUnmet = unmetGroups[0];
     return {
-      isValid: true,
-      unmetGroups: [],
-      errorMessage: null,
+      isValid: false,
+      unmetGroups,
+      errorMessage: `Vui lòng chọn đủ tùy chọn cho: ${firstUnmet.name}`,
     };
   }
 
-  const firstUnmet = unmetGroups[0];
-  const errorMessage = `Vui lòng chọn đủ tùy chọn cho: ${firstUnmet.name}`;
+  const exceededGroups = getExceededModifierGroups(modifierGroups, selectedModifiersMap);
+  if (exceededGroups.length > 0) {
+    const firstExceeded = exceededGroups[0];
+    return {
+      isValid: false,
+      unmetGroups: exceededGroups,
+      errorMessage: `Vui lòng chọn tối đa ${firstExceeded.maxSelections} tùy chọn cho: ${firstExceeded.name}`,
+    };
+  }
 
   return {
-    isValid: false,
-    unmetGroups,
-    errorMessage,
+    isValid: true,
+    unmetGroups: [],
+    errorMessage: null,
   };
 }
 
