@@ -219,14 +219,11 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // 4. Atomic Promotion Usage Counter Increment & Limit Enforcement
-        if (evalResponse.getAppliedPromotionId() != null) {
-            PromotionEntity promo = promotionRepository.findByPromotionId(evalResponse.getAppliedPromotionId()).orElse(null);
-            if (promo != null) {
-                if (promo.getUsageLimit() != null && promo.getTimesUsed() != null && promo.getTimesUsed() >= promo.getUsageLimit()) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mã giảm giá đã đạt giới hạn lượt sử dụng");
-                }
-                promo.setTimesUsed((promo.getTimesUsed() != null ? promo.getTimesUsed() : 0) + 1);
-                promotionRepository.save(promo);
+        String appliedPromotionId = evalResponse.getAppliedPromotionId();
+        if (appliedPromotionId != null && !appliedPromotionId.trim().isEmpty()) {
+            int updatedRows = promotionRepository.incrementTimesUsedIfUnderLimit(appliedPromotionId.trim());
+            if (updatedRows == 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mã giảm giá đã đạt giới hạn lượt sử dụng");
             }
         }
 
@@ -564,12 +561,9 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // 2. Hoàn lại quota Promotion nếu có áp dụng
-        if (order.getPromotionId() != null && !order.getPromotionId().trim().isEmpty()) {
-            PromotionEntity promo = promotionRepository.findByPromotionId(order.getPromotionId()).orElse(null);
-            if (promo != null && promo.getTimesUsed() != null && promo.getTimesUsed() > 0) {
-                promo.setTimesUsed(promo.getTimesUsed() - 1);
-                promotionRepository.save(promo);
-            }
+        String appliedPromoId = order.getPromotionId();
+        if (appliedPromoId != null && !appliedPromoId.trim().isEmpty()) {
+            promotionRepository.decrementTimesUsed(appliedPromoId.trim());
         }
 
         // 3. Customer CRM metrics: Skipped for PENDING orders (Ticket 04)
