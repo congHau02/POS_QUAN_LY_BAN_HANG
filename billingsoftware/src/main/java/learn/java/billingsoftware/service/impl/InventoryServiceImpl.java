@@ -92,8 +92,9 @@ public class InventoryServiceImpl implements InventoryService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Variant not found with ID: " + request.getVariantId()));
 
-        int currentStock = variant.getCachedStockQuantity() != null ? variant.getCachedStockQuantity() : 0;
-        int discrepancy = request.getActualCount() - currentStock;
+        Integer ledgerStock = inventoryTransactionRepository.calculateStockByVariantId(variant.getVariantId());
+        int currentLedgerStock = ledgerStock != null ? ledgerStock : 0;
+        int discrepancy = request.getActualCount() - currentLedgerStock;
 
         String refId = (request.getReferenceId() != null && !request.getReferenceId().trim().isEmpty())
                 ? request.getReferenceId().trim()

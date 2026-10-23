@@ -5,6 +5,7 @@ import learn.java.billingsoftware.entity.CustomerEntity;
 import vn.payos.model.webhooks.WebhookData;
 import learn.java.billingsoftware.entity.InventoryTransactionEntity;
 import learn.java.billingsoftware.entity.OrderEntity;
+import learn.java.billingsoftware.entity.OrderItemEntity;
 import learn.java.billingsoftware.entity.VariantEntity;
 import learn.java.billingsoftware.io.*;
 import learn.java.billingsoftware.repository.*;
@@ -143,7 +144,6 @@ class OrderServiceUnitTest {
                 .cachedStockQuantity(20)
                 .build();
         when(variantRepository.findByVariantId("VAR-123")).thenReturn(Optional.of(variant));
-        when(inventoryTransactionRepository.calculateStockByVariantId("VAR-123")).thenReturn(18);
 
         OrderRequest.OrderItemRequest itemReq = new OrderRequest.OrderItemRequest();
         itemReq.setItemId("ITEM-1");
@@ -189,6 +189,10 @@ class OrderServiceUnitTest {
                 "PayOS description must not exceed 25 characters to avoid PayOS 400 rejection");
         assertEquals(generatedOrderId, payOsReq.getDescription(),
                 "PayOS description should consume enhanced orderId without length overflow");
+
+        // 4. Verify cachedStockQuantity is decremented directly without calculating ledger sum
+        assertEquals(18, variant.getCachedStockQuantity(), "Stock should be decremented directly from 20 to 18");
+        verify(inventoryTransactionRepository, never()).calculateStockByVariantId(any());
     }
 
     @Test
@@ -330,7 +334,6 @@ class OrderServiceUnitTest {
                 .cachedStockQuantity(10)
                 .build();
         when(variantRepository.findByVariantId("VAR-999")).thenReturn(Optional.of(variant));
-        when(inventoryTransactionRepository.calculateStockByVariantId("VAR-999")).thenReturn(10);
 
         OrderRequest.OrderItemRequest itemReq = new OrderRequest.OrderItemRequest();
         itemReq.setItemId("ITEM-999");
@@ -368,6 +371,10 @@ class OrderServiceUnitTest {
                 anyString(),
                 contains("due to PayOS failure")
         );
+
+        // Verify cached stock restored directly without calling calculateStockByVariantId
+        assertEquals(10, variant.getCachedStockQuantity(), "Stock should be restored to 10 after compensating auto-reversal");
+        verify(inventoryTransactionRepository, never()).calculateStockByVariantId(any());
     }
 
     @Test
@@ -414,8 +421,6 @@ class OrderServiceUnitTest {
         VariantEntity variant2 = VariantEntity.builder().variantId("VAR-2").cachedStockQuantity(10).build();
         when(variantRepository.findByVariantId("VAR-1")).thenReturn(Optional.of(variant1));
         when(variantRepository.findByVariantId("VAR-2")).thenReturn(Optional.of(variant2));
-        when(inventoryTransactionRepository.calculateStockByVariantId("VAR-1")).thenReturn(10);
-        when(inventoryTransactionRepository.calculateStockByVariantId("VAR-2")).thenReturn(10);
 
         OrderRequest.OrderItemRequest item1 = new OrderRequest.OrderItemRequest();
         item1.setItemId("ITEM-1");
@@ -501,8 +506,6 @@ class OrderServiceUnitTest {
         VariantEntity variant2 = VariantEntity.builder().variantId("VAR-2").cachedStockQuantity(10).build();
         when(variantRepository.findByVariantId("VAR-1")).thenReturn(Optional.of(variant1));
         when(variantRepository.findByVariantId("VAR-2")).thenReturn(Optional.of(variant2));
-        when(inventoryTransactionRepository.calculateStockByVariantId("VAR-1")).thenReturn(10);
-        when(inventoryTransactionRepository.calculateStockByVariantId("VAR-2")).thenReturn(10);
 
         OrderRequest.OrderItemRequest item1 = new OrderRequest.OrderItemRequest();
         item1.setItemId("ITEM-1");
@@ -594,7 +597,6 @@ class OrderServiceUnitTest {
                 .cachedStockQuantity(20)
                 .build();
         when(variantRepository.findByVariantId("VAR-123")).thenReturn(Optional.of(variant));
-        when(inventoryTransactionRepository.calculateStockByVariantId("VAR-123")).thenReturn(18);
 
         CustomerEntity customer = CustomerEntity.builder()
                 .customerId("CUST-1")
@@ -652,7 +654,6 @@ class OrderServiceUnitTest {
                 .cachedStockQuantity(20)
                 .build();
         when(variantRepository.findByVariantId("VAR-123")).thenReturn(Optional.of(variant));
-        when(inventoryTransactionRepository.calculateStockByVariantId("VAR-123")).thenReturn(18);
 
         CustomerEntity customer = CustomerEntity.builder()
                 .customerId("CUST-1")
@@ -807,5 +808,39 @@ class OrderServiceUnitTest {
         verify(customerRepository, never()).save(any(CustomerEntity.class));
         assertEquals(2, customer.getOrderCount());
         assertEquals(200000.0, customer.getTotalSpent(), 0.001);
+    }
+
+    @Test
+    @DisplayName("cancelOrder increments variant cachedStockQuantity directly in O(1) without querying calculateStockByVariantId")
+    void testCancelOrderRestoresCachedStockQuantityDirectly() {
+        PaymentDetails pd = new PaymentDetails();
+        pd.setStatus(PaymentDetails.PaymentStatus.PENDING);
+
+        VariantEntity variant = VariantEntity.builder()
+                .variantId("VAR-COMP")
+                .cachedStockQuantity(8)
+                .build();
+        when(variantRepository.findByVariantId("VAR-COMP")).thenReturn(Optional.of(variant));
+
+        OrderItemEntity orderItem = OrderItemEntity.builder()
+                .variantId("VAR-COMP")
+                .quantity(2)
+                .build();
+
+        OrderEntity order = OrderEntity.builder()
+                .id(445L)
+                .orderId("ORD-445")
+                .items(List.of(orderItem))
+                .paymentMethod(PaymentMethod.CASH)
+                .paymentDetails(pd)
+                .build();
+        when(orderEntityRepository.findByOrderId("ORD-445")).thenReturn(Optional.of(order));
+        when(orderEntityRepository.save(any(OrderEntity.class))).thenAnswer(inv -> inv.getArgument(0));
+
+        orderService.cancelOrder("ORD-445");
+
+        assertEquals(10, variant.getCachedStockQuantity(), "Stock should be restored from 8 to 10 directly");
+        verify(inventoryTransactionRepository, never()).calculateStockByVariantId(any());
+        verify(variantRepository).save(variant);
     }
 }

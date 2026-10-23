@@ -245,6 +245,48 @@ public class StockCheckIntegrationTest {
 
     @Test
     @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void testStockCheckReconcilesDriftBetweenCachedStockAndLedger() throws Exception {
+        // 1. Initial ledger transaction: IN 10 -> Ledger sum = 10
+        inventoryTransactionRepository.saveAndFlush(InventoryTransactionEntity.builder()
+                .transactionId(UUID.randomUUID().toString())
+                .variant(testVariant)
+                .transactionType(TransactionType.IN)
+                .quantity(10)
+                .referenceId("INIT-PO")
+                .build());
+
+        // 2. Simulate drift: cachedStockQuantity is set to 12 (drift of +2 from ledger)
+        testVariant.setCachedStockQuantity(12);
+        variantRepository.save(testVariant);
+
+        // 3. Physical stock check counts 15 units
+        StockCheckRequest request = StockCheckRequest.builder()
+                .variantId(testVariant.getVariantId())
+                .actualCount(15)
+                .referenceId("AUDIT-DRIFT-RECONCILE")
+                .note("Audit reconciling cached drift with true physical reality")
+                .build();
+
+        // Discrepancy against true ledger (10) must be: 15 - 10 = +5.
+        // If discrepancy were incorrectly calculated against cachedStock (12), it would be +3, leaving ledger at 13.
+        mockMvc.perform(post("/admin/inventory/stock-check")
+                        .with(user("admin").roles("ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.transactionType", is("ADJUSTMENT")))
+                .andExpect(jsonPath("$.quantity", is(5)))
+                .andExpect(jsonPath("$.balanceAfter", is(15)));
+
+        VariantEntity updatedVariant = variantRepository.findByVariantId(testVariant.getVariantId()).orElseThrow();
+        assertEquals(15, updatedVariant.getCachedStockQuantity());
+
+        Integer finalLedgerSum = inventoryTransactionRepository.calculateStockByVariantId(testVariant.getVariantId());
+        assertEquals(15, finalLedgerSum, "Historical ledger sum must perfectly match actual physical count (15)");
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
     void testStockCheckValidationErrors() throws Exception {
         // Missing variantId
         StockCheckRequest reqNoVariant = StockCheckRequest.builder()

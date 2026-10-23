@@ -269,8 +269,8 @@ public class OrderServiceImpl implements OrderService {
                         .build();
                 inventoryTransactionRepository.saveAndFlush(transaction);
 
-                Integer updatedStock = inventoryTransactionRepository.calculateStockByVariantId(variant.getVariantId());
-                variant.setCachedStockQuantity(updatedStock != null ? updatedStock : 0);
+                int currentStock = variant.getCachedStockQuantity() != null ? variant.getCachedStockQuantity() : 0;
+                variant.setCachedStockQuantity(currentStock - soldQuantity);
                 variantRepository.save(variant);
             }
         }
@@ -553,8 +553,8 @@ public class OrderServiceImpl implements OrderService {
                             .build();
                     inventoryTransactionRepository.saveAndFlush(transaction);
 
-                    Integer updatedStock = inventoryTransactionRepository.calculateStockByVariantId(variant.getVariantId());
-                    variant.setCachedStockQuantity(updatedStock != null ? updatedStock : 0);
+                    int currentStock = variant.getCachedStockQuantity() != null ? variant.getCachedStockQuantity() : 0;
+                    variant.setCachedStockQuantity(currentStock + quantityToRevert);
                     variantRepository.save(variant);
                 }
             }
