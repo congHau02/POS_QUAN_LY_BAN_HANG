@@ -24,6 +24,25 @@ test("CartSummary.jsx does not invoke setState synchronously during render", () 
   );
 });
 
+test("CartSummary.jsx consolidates PayOS modal dismissal into handleClosePayOSModal", () => {
+  const content = fs.readFileSync(
+    path.join(SRC_DIR, "features/Explore/CartSummary.jsx"),
+    "utf8"
+  );
+
+  assert.equal(
+    content.includes("handleClosePayOSModal"),
+    true,
+    "CartSummary must define handleClosePayOSModal"
+  );
+  const occurrences = (content.match(/onClick=\{handleClosePayOSModal\}/g) || []).length;
+  assert.equal(
+    occurrences >= 2,
+    true,
+    "handleClosePayOSModal must be attached to both backdrop and dismiss button"
+  );
+});
+
 test("Menubar.jsx consolidates outside click listeners into a single call", () => {
   const content = fs.readFileSync(
     path.join(SRC_DIR, "ui/Menubar.jsx"),

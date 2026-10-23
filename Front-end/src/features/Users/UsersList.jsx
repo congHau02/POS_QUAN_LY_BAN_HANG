@@ -1,6 +1,9 @@
 import { useState, useMemo, useCallback } from "react";
+import toast from "react-hot-toast";
 import { useUsers } from "./useUsers";
 import { useDeleteUser } from "./useDeleteUser";
+import { useCurrentUser } from "../../hooks/useCurrentUser";
+import { isSelfAccount } from "./userUtils";
 import UserItem from "./UserItem";
 import ConfirmDeleteModal from "../../ui/ConfirmDeleteModal";
 import EditUserModal from "./EditUserModal";
@@ -10,6 +13,7 @@ import { Search, Users as UsersIcon } from "lucide-react";
 function UsersList() {
   const { isLoading, users } = useUsers();
   const { isDeleting, deleteUser } = useDeleteUser();
+  const { user: currentUser } = useCurrentUser();
   const [searchTerm, setSearchTerm] = useState("");
   const [userToDelete, setUserToDelete] = useState(null);
   const [userToEdit, setUserToEdit] = useState(null);
@@ -27,9 +31,16 @@ function UsersList() {
     setUserToEdit(user);
   }, []);
 
-  const handleDelete = useCallback((user) => {
-    setUserToDelete(user);
-  }, []);
+  const handleDelete = useCallback(
+    (user) => {
+      if (isSelfAccount(user, currentUser)) {
+        toast.error("Không thể tự xóa tài khoản đang đăng nhập");
+        return;
+      }
+      setUserToDelete(user);
+    },
+    [currentUser]
+  );
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -61,6 +72,7 @@ function UsersList() {
             <UserItem
               key={user.userId || index}
               user={user}
+              currentUser={currentUser}
               onEdit={handleEdit}
               onDelete={handleDelete}
             />
@@ -81,6 +93,11 @@ function UsersList() {
           isOpen={Boolean(userToDelete)}
           onClose={() => setUserToDelete(null)}
           onConfirm={() => {
+            if (isSelfAccount(userToDelete, currentUser)) {
+              toast.error("Không thể tự xóa tài khoản đang đăng nhập");
+              setUserToDelete(null);
+              return;
+            }
             deleteUser(userToDelete.userId, {
               onSettled: () => setUserToDelete(null),
             });

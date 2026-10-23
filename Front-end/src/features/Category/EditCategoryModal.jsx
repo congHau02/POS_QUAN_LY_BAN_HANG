@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useForm, useWatch } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -26,6 +26,14 @@ export default function EditCategoryModal({ isOpen, onClose, category }) {
   const [previewUrl, setPreviewUrl] = useState(
     () => category?.imgUrl || DEFAULT_PREVIEW
   );
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl && previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
 
   useLockBodyScroll(isOpen);
   useEscapeKey(() => {
@@ -111,7 +119,7 @@ export default function EditCategoryModal({ isOpen, onClose, category }) {
               <Edit3 size={18} />
             </div>
             <div>
-              <h3 className="text-base font-semibold text-slate-900">Chỉnh sủa danh mục</h3>
+              <h3 className="text-base font-semibold text-slate-900">Chỉnh sửa danh mục</h3>
               <p className="text-xs text-slate-500">Cập nhật thông tin và giao diện danh mục</p>
             </div>
           </div>
@@ -195,7 +203,7 @@ export default function EditCategoryModal({ isOpen, onClose, category }) {
             <textarea
               rows={2}
               disabled={isUpdating}
-              placeholder="Nhập mõ tả danh mục không bắt buộc..."
+              placeholder="Nhập mô tả danh mục không bắt buộc..."
               className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors disabled:bg-slate-100 resize-none"
               {...register("description")}
             />
@@ -263,4 +271,3 @@ export default function EditCategoryModal({ isOpen, onClose, category }) {
 
   return createPortal(modalContent, document.body);
 }
-

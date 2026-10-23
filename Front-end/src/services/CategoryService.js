@@ -1,10 +1,13 @@
 import api from "../utils/axiosConfig";
 
 export const addCategory = async (category) => {
-  return await api.post("/admin/categories", category);
+  const response = await api.post("/admin/categories", category);
+  return response.data;
 };
+
 export const deleteCategory = async (categoryId) => {
-  return await api.delete(`/admin/categories/${categoryId}`);
+  const response = await api.delete(`/admin/categories/${categoryId}`);
+  return response.data;
 };
 
 export const updateCategory = async (categoryId, formData) => {

@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { createPortal } from "react-dom";
 import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import toast from "react-hot-toast";
@@ -84,6 +84,14 @@ export default function EditItemModal({ isOpen, onClose, item }) {
   const [previewUrl, setPreviewUrl] = useState(
     () => item?.imgUrl || DEFAULT_PREVIEW
   );
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl && previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(previewUrl);
+      }
+    };
+  }, [previewUrl]);
   const [selectedModifierGroupIds, setSelectedModifierGroupIds] = useState(
     () => (item?.modifierGroups || []).map((g) => g.groupId)
   );
