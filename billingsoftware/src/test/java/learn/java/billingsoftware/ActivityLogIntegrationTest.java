@@ -13,6 +13,7 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
@@ -192,6 +193,7 @@ public class ActivityLogIntegrationTest {
 
     @Test
     @DisplayName("User creation and deletion emit CREATE and DELETE activity logs")
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void testUserMutationsEmitActivityLogs() throws Exception {
         String uniqueEmail = "testuser." + UUID.randomUUID().toString().substring(0, 8) + "@billing.com";
         UserRequest userRequest = UserRequest.builder()
@@ -236,6 +238,7 @@ public class ActivityLogIntegrationTest {
 
     @Test
     @DisplayName("Promotion mutations emit CREATE, UPDATE, and DELETE activity logs")
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void testPromotionMutationsEmitActivityLogs() throws Exception {
         String promoCode = "PROMO_" + UUID.randomUUID().toString().substring(0, 6).toUpperCase();
         PromotionRequest promoRequest = PromotionRequest.builder()
@@ -294,6 +297,7 @@ public class ActivityLogIntegrationTest {
 
     @Test
     @DisplayName("Modifier group mutations emit CREATE, UPDATE, and DELETE activity logs")
+    @Transactional(propagation = Propagation.NOT_SUPPORTED)
     void testModifierGroupMutationsEmitActivityLogs() throws Exception {
         ModifierGroupRequest mgRequest = ModifierGroupRequest.builder()
                 .name("Sugar Level")

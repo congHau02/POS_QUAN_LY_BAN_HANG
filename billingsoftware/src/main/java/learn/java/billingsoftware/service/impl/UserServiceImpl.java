@@ -8,6 +8,7 @@ import learn.java.billingsoftware.service.ActivityLogService;
 import learn.java.billingsoftware.service.UserService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -89,6 +90,14 @@ public class UserServiceImpl implements UserService {
     public void deleteUser(String id) {
         UserEntity existingUser = userRepository.findByUserId(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found with id: " + id));
+        var authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null && authentication.getName() != null && !authentication.getName().isBlank() && !authentication.getName().equals("anonymousUser")) {
+            String currentAuthEmail = authentication.getName().trim().toLowerCase();
+            if (existingUser.getEmail() != null && existingUser.getEmail().trim().toLowerCase().equals(currentAuthEmail)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Không thể tự xóa tài khoản đang đăng nhập: " + existingUser.getEmail());
+            }
+        }
+
         userRepository.delete(existingUser);
         activityLogService.logActivity("DELETE", "USER", existingUser.getUserId(), "Deleted user: " + existingUser.getEmail());
     }
