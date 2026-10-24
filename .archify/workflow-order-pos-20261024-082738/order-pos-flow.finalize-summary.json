@@ -1,0 +1,70 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "workflow",
+  "quality": "standard",
+  "specification": {
+    "path": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\candidate.json",
+    "sha256": "5c3882d45536beb3b36d5cd9ac44ea6ac08ab6a0370ca346d68d8060b4e68b96",
+    "bytes": 12132
+  },
+  "artifact": {
+    "path": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.html",
+    "sha256": "a93b0f19a64695f6348e490ccb04ea9f98a428213f8276258b48b41c167961f4",
+    "bytes": 846235
+  },
+  "gates": {
+    "validate": "pass",
+    "deliver": "pass",
+    "check": "pass",
+    "browser-check": "fail"
+  },
+  "failedStage": "browser-check",
+  "diagnostics": [
+    {
+      "code": "viewer/evidence-path-conflict",
+      "severity": "error",
+      "message": "browser-check will not replace the existing unowned evidence path \"E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.browser-check.json\".",
+      "subject": {
+        "artifact": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.html",
+        "evidencePath": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.browser-check.json"
+      },
+      "evidence": {
+        "reason": {
+          "code": "ownership-artifact-mismatch"
+        }
+      },
+      "supportedFixes": [
+        "move the conflicting file aside, or choose a separate --out-dir, then rerun browser-check"
+      ]
+    }
+  ],
+  "diagnosticSummary": {
+    "total": 1,
+    "shown": 1,
+    "truncated": false
+  },
+  "evidence": {
+    "receipt": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.finalize.json",
+    "summaryReceipt": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.finalize-summary.json",
+    "browserCheckReceipt": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.browser-check.json"
+  },
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-24T01:35:42.127Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  },
+  "visualReview": "not-requested",
+  "durationMs": 2313,
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  }
+}

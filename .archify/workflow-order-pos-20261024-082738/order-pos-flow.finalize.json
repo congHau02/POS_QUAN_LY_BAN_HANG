@@ -1,0 +1,722 @@
+{
+  "schemaVersion": 1,
+  "ok": false,
+  "command": "finalize",
+  "status": "fail",
+  "type": "workflow",
+  "quality": "standard",
+  "startedAt": "2026-10-24T01:41:20.265Z",
+  "specification": {
+    "path": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\candidate.json",
+    "sha256": "5c3882d45536beb3b36d5cd9ac44ea6ac08ab6a0370ca346d68d8060b4e68b96",
+    "bytes": 12132
+  },
+  "artifact": {
+    "path": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.html",
+    "sha256": "a93b0f19a64695f6348e490ccb04ea9f98a428213f8276258b48b41c167961f4",
+    "bytes": 846235
+  },
+  "stages": {
+    "validate": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": null,
+      "execution": "embedded-in-deliver",
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.agents\\skills\\archify\\bin\\archify.mjs",
+        "deliver",
+        "workflow",
+        "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\candidate.json",
+        "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.html",
+        "--quality",
+        "standard",
+        "--repo-root",
+        "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": true,
+        "command": "validate",
+        "specification": {
+          "sha256": "5c3882d45536beb3b36d5cd9ac44ea6ac08ab6a0370ca346d68d8060b4e68b96",
+          "bytes": 12132
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "standard",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 4,
+          "compositionIssues": [
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "compensate-stock",
+                "from": "compensate_engine",
+                "to": "stock_out",
+                "label": "hoàn kho IN",
+                "collectionIndex": 3,
+                "artifactIndex": 4
+              },
+              "otherRelationship": {
+                "id": "payos-branch",
+                "from": "pay_router",
+                "to": "payos_call",
+                "label": "VietQR PayOS",
+                "collectionIndex": 7,
+                "artifactIndex": 8
+              },
+              "point": [
+                362.4,
+                409
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "complete-crm",
+                "from": "order_complete",
+                "to": "crm_accrue",
+                "label": "cộng CRM",
+                "collectionIndex": 4,
+                "artifactIndex": 5
+              },
+              "otherRelationship": {
+                "id": "pending-webhook",
+                "from": "order_pending",
+                "to": "webhook_verify",
+                "label": "quét VietQR",
+                "collectionIndex": 12,
+                "artifactIndex": 13
+              },
+              "point": [
+                792.8,
+                285
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/ambiguous-corridor",
+              "relationship": {
+                "id": "payos-branch",
+                "from": "pay_router",
+                "to": "payos_call",
+                "label": "VietQR PayOS",
+                "collectionIndex": 7,
+                "artifactIndex": 8
+              },
+              "otherRelationship": {
+                "id": "payos-error",
+                "from": "payos_call",
+                "to": "compensate_engine",
+                "label": "lỗi cổng 502",
+                "collectionIndex": 8,
+                "artifactIndex": 9
+              },
+              "segmentIndex": 2,
+              "otherSegmentIndex": 1,
+              "overlapLength": 37,
+              "from": [
+                362.4,
+                446
+              ],
+              "to": [
+                362.4,
+                483
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/ambiguous-corridor",
+              "relationship": {
+                "id": "pending-qr",
+                "from": "order_pending",
+                "to": "pos_qr_wait",
+                "label": "trả mã QR",
+                "collectionIndex": 11,
+                "artifactIndex": 12
+              },
+              "otherRelationship": {
+                "id": "pending-webhook",
+                "from": "order_pending",
+                "to": "webhook_verify",
+                "label": "quét VietQR",
+                "collectionIndex": 12,
+                "artifactIndex": 13
+              },
+              "segmentIndex": 1,
+              "otherSegmentIndex": 1,
+              "overlapLength": 506,
+              "from": [
+                637.2,
+                533
+              ],
+              "to": [
+                1143.2,
+                533
+              ]
+            }
+          ]
+        }
+      }
+    },
+    "deliver": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 1428,
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.agents\\skills\\archify\\bin\\archify.mjs",
+        "deliver",
+        "workflow",
+        "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\candidate.json",
+        "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.html",
+        "--quality",
+        "standard",
+        "--repo-root",
+        "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app",
+        "--json"
+      ],
+      "receipt": {
+        "schemaVersion": 1,
+        "receiptId": "f101f895-fe6d-4c22-88ba-80156fa98d20",
+        "ok": true,
+        "command": "deliver",
+        "type": "workflow",
+        "input": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\candidate.json",
+        "output": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.html",
+        "specification": {
+          "sha256": "5c3882d45536beb3b36d5cd9ac44ea6ac08ab6a0370ca346d68d8060b4e68b96",
+          "bytes": 12132
+        },
+        "artifact": {
+          "sha256": "a93b0f19a64695f6348e490ccb04ea9f98a428213f8276258b48b41c167961f4",
+          "bytes": 846235
+        },
+        "validation": {
+          "checksPassed": 9,
+          "checkCount": 9,
+          "compositionProfile": "standard",
+          "compositionStatus": "pass",
+          "errors": 0,
+          "warnings": 4,
+          "compositionIssues": [
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "compensate-stock",
+                "from": "compensate_engine",
+                "to": "stock_out",
+                "label": "hoàn kho IN",
+                "collectionIndex": 3,
+                "artifactIndex": 4
+              },
+              "otherRelationship": {
+                "id": "payos-branch",
+                "from": "pay_router",
+                "to": "payos_call",
+                "label": "VietQR PayOS",
+                "collectionIndex": 7,
+                "artifactIndex": 8
+              },
+              "point": [
+                362.4,
+                409
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "complete-crm",
+                "from": "order_complete",
+                "to": "crm_accrue",
+                "label": "cộng CRM",
+                "collectionIndex": 4,
+                "artifactIndex": 5
+              },
+              "otherRelationship": {
+                "id": "pending-webhook",
+                "from": "order_pending",
+                "to": "webhook_verify",
+                "label": "quét VietQR",
+                "collectionIndex": 12,
+                "artifactIndex": 13
+              },
+              "point": [
+                792.8,
+                285
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/ambiguous-corridor",
+              "relationship": {
+                "id": "payos-branch",
+                "from": "pay_router",
+                "to": "payos_call",
+                "label": "VietQR PayOS",
+                "collectionIndex": 7,
+                "artifactIndex": 8
+              },
+              "otherRelationship": {
+                "id": "payos-error",
+                "from": "payos_call",
+                "to": "compensate_engine",
+                "label": "lỗi cổng 502",
+                "collectionIndex": 8,
+                "artifactIndex": 9
+              },
+              "segmentIndex": 2,
+              "otherSegmentIndex": 1,
+              "overlapLength": 37,
+              "from": [
+                362.4,
+                446
+              ],
+              "to": [
+                362.4,
+                483
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/ambiguous-corridor",
+              "relationship": {
+                "id": "pending-qr",
+                "from": "order_pending",
+                "to": "pos_qr_wait",
+                "label": "trả mã QR",
+                "collectionIndex": 11,
+                "artifactIndex": 12
+              },
+              "otherRelationship": {
+                "id": "pending-webhook",
+                "from": "order_pending",
+                "to": "webhook_verify",
+                "label": "quét VietQR",
+                "collectionIndex": 12,
+                "artifactIndex": 13
+              },
+              "segmentIndex": 1,
+              "otherSegmentIndex": 1,
+              "overlapLength": 506,
+              "from": [
+                637.2,
+                533
+              ],
+              "to": [
+                1143.2,
+                533
+              ]
+            }
+          ]
+        },
+        "evidence": {
+          "verified": true,
+          "repository": "https://github.com/Hauhuhuhu/DEVOPS_TEST",
+          "revision": "aaad3a259963fe465fc06c847a1ce914fc2b95a9",
+          "references": 14
+        },
+        "update": {
+          "status": "unavailable",
+          "installedVersion": null,
+          "availableVersion": null,
+          "releaseNotes": null,
+          "checkedAt": null,
+          "source": null,
+          "noticeRequired": false,
+          "noticeText": null,
+          "reason": "disabled"
+        }
+      }
+    },
+    "check": {
+      "status": "pass",
+      "exitCode": 0,
+      "durationMs": 284,
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.agents\\skills\\archify\\bin\\archify.mjs",
+        "check",
+        "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.html",
+        "--require-provenance"
+      ],
+      "receipt": {
+        "ok": true,
+        "file": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.html",
+        "artifact": {
+          "sha256": "a93b0f19a64695f6348e490ccb04ea9f98a428213f8276258b48b41c167961f4",
+          "bytes": 846235
+        },
+        "checks": [
+          {
+            "name": "single_svg",
+            "ok": true,
+            "details": [
+              "found 1 <svg> block(s)"
+            ]
+          },
+          {
+            "name": "finite_svg",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "orthogonal_arrows",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "label_route_clearance",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "relationship_crossings",
+            "ok": true,
+            "details": [
+              "[composition/proper-crossing] standard relationship id \"compensate-stock\" (\"compensate_engine\" -> \"stock_out\") crosses relationship id \"payos-branch\" (\"pay_router\" -> \"payos_call\") at [362.4, 409]",
+              "[composition/proper-crossing] standard relationship id \"complete-crm\" (\"order_complete\" -> \"crm_accrue\") crosses relationship id \"pending-webhook\" (\"order_pending\" -> \"webhook_verify\") at [792.8, 285]"
+            ]
+          },
+          {
+            "name": "relationship_corridors",
+            "ok": true,
+            "details": [
+              "[composition/ambiguous-corridor] standard relationship id \"payos-branch\" (\"pay_router\" -> \"payos_call\") shares a 37px corridor with relationship id \"payos-error\" (\"payos_call\" -> \"compensate_engine\") at [362.4, 446] -> [362.4, 483]",
+              "[composition/ambiguous-corridor] standard relationship id \"pending-qr\" (\"order_pending\" -> \"pos_qr_wait\") shares a 506px corridor with relationship id \"pending-webhook\" (\"order_pending\" -> \"webhook_verify\") at [637.2, 533] -> [1143.2, 533]"
+            ]
+          },
+          {
+            "name": "container_border_runs",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "route_rhythm",
+            "ok": true,
+            "details": []
+          },
+          {
+            "name": "legend_clearance",
+            "ok": true,
+            "details": []
+          }
+        ],
+        "composition": {
+          "schemaVersion": 1,
+          "profile": "standard",
+          "status": "pass",
+          "summary": {
+            "errors": 0,
+            "warnings": 4
+          },
+          "metrics": {
+            "properCrossings": 2,
+            "resolvedCrossovers": 0,
+            "ambiguousCorridors": 2,
+            "arrowheadCollisions": 0,
+            "containerBorderRuns": 0,
+            "labelRouteClearanceIssues": 0,
+            "labelCanvasOverflowIssues": 0,
+            "minLabelRouteClearance": 6,
+            "desktopReadabilityIssues": 0,
+            "viewportHeightIssues": 0,
+            "minProjectedNodeTextPx": 6.315789473684211,
+            "maxBends": 0,
+            "routesOverSuggestedBends": 0,
+            "maxStretch": 1,
+            "routesOverSuggestedStretch": 0,
+            "minSegmentPx": 8,
+            "minInteriorSegmentPx": null,
+            "shortSegmentCount": 15,
+            "shortEndpointSegmentCount": 15,
+            "shortInteriorSegmentCount": 0,
+            "microSegmentCount": 0
+          },
+          "suggestedLimits": {
+            "bendsPerRelationship": 2,
+            "stretch": 1.35,
+            "segmentPx": 16,
+            "microSegmentPx": 8
+          },
+          "routeReview": {
+            "crossings": [],
+            "detours": []
+          },
+          "leadingSpace": {
+            "measured": false,
+            "reviewSuggested": false
+          },
+          "desktopReadability": {
+            "budgetBasis": "legacy-930",
+            "readerContract": "declared-wide-v1",
+            "availableDiagramWidth": 930,
+            "actualBudgetPx": 930,
+            "limit": "legacy",
+            "requestedTargetPx": null,
+            "requestedTargetMet": null,
+            "hardFloorPx": 6,
+            "hardFloorMet": true,
+            "minimumOwner": {
+              "kind": "edge",
+              "id": "cart-promo",
+              "from": "pos_cart",
+              "to": "promo_calc"
+            },
+            "minimumSourceTextPx": 8,
+            "minimumProjectedTextPx": 6.315789473684211,
+            "semanticTextCount": 31
+          },
+          "issues": [
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "compensate-stock",
+                "from": "compensate_engine",
+                "to": "stock_out",
+                "label": "hoàn kho IN",
+                "collectionIndex": 3,
+                "artifactIndex": 4
+              },
+              "otherRelationship": {
+                "id": "payos-branch",
+                "from": "pay_router",
+                "to": "payos_call",
+                "label": "VietQR PayOS",
+                "collectionIndex": 7,
+                "artifactIndex": 8
+              },
+              "point": [
+                362.4,
+                409
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/proper-crossing",
+              "relationship": {
+                "id": "complete-crm",
+                "from": "order_complete",
+                "to": "crm_accrue",
+                "label": "cộng CRM",
+                "collectionIndex": 4,
+                "artifactIndex": 5
+              },
+              "otherRelationship": {
+                "id": "pending-webhook",
+                "from": "order_pending",
+                "to": "webhook_verify",
+                "label": "quét VietQR",
+                "collectionIndex": 12,
+                "artifactIndex": 13
+              },
+              "point": [
+                792.8,
+                285
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/ambiguous-corridor",
+              "relationship": {
+                "id": "payos-branch",
+                "from": "pay_router",
+                "to": "payos_call",
+                "label": "VietQR PayOS",
+                "collectionIndex": 7,
+                "artifactIndex": 8
+              },
+              "otherRelationship": {
+                "id": "payos-error",
+                "from": "payos_call",
+                "to": "compensate_engine",
+                "label": "lỗi cổng 502",
+                "collectionIndex": 8,
+                "artifactIndex": 9
+              },
+              "segmentIndex": 2,
+              "otherSegmentIndex": 1,
+              "overlapLength": 37,
+              "from": [
+                362.4,
+                446
+              ],
+              "to": [
+                362.4,
+                483
+              ]
+            },
+            {
+              "severity": "warning",
+              "code": "composition/ambiguous-corridor",
+              "relationship": {
+                "id": "pending-qr",
+                "from": "order_pending",
+                "to": "pos_qr_wait",
+                "label": "trả mã QR",
+                "collectionIndex": 11,
+                "artifactIndex": 12
+              },
+              "otherRelationship": {
+                "id": "pending-webhook",
+                "from": "order_pending",
+                "to": "webhook_verify",
+                "label": "quét VietQR",
+                "collectionIndex": 12,
+                "artifactIndex": 13
+              },
+              "segmentIndex": 1,
+              "otherSegmentIndex": 1,
+              "overlapLength": 506,
+              "from": [
+                637.2,
+                533
+              ],
+              "to": [
+                1143.2,
+                533
+              ]
+            }
+          ]
+        },
+        "provenance": "current",
+        "deliveryReceiptId": "f101f895-fe6d-4c22-88ba-80156fa98d20"
+      }
+    },
+    "browser-check": {
+      "status": "fail",
+      "exitCode": 1,
+      "durationMs": 67,
+      "command": [
+        "C:\\Program Files\\nodejs\\node.exe",
+        "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.agents\\skills\\archify\\bin\\archify.mjs",
+        "browser-check",
+        "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.html",
+        "--json",
+        "--require-provenance"
+      ],
+      "execution": "in-process",
+      "receipt": {
+        "schemaVersion": 1,
+        "ok": false,
+        "command": "browser-check",
+        "evidenceKind": "automated-browser",
+        "status": "fail",
+        "visualReview": "not-requested",
+        "provenance": "current",
+        "deliveryReceiptId": "f101f895-fe6d-4c22-88ba-80156fa98d20",
+        "artifact": {
+          "path": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.html",
+          "sha256": "a93b0f19a64695f6348e490ccb04ea9f98a428213f8276258b48b41c167961f4",
+          "bytes": 846235
+        },
+        "state": {
+          "detail": "read",
+          "motion": "still"
+        },
+        "chrome": {
+          "status": "not-checked",
+          "executable": null
+        },
+        "diagnostics": [
+          {
+            "code": "viewer/evidence-path-conflict",
+            "severity": "error",
+            "message": "browser-check will not replace the existing unowned evidence path \"E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.browser-check.json\".",
+            "subject": {
+              "artifact": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.html",
+              "evidencePath": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.browser-check.json"
+            },
+            "evidence": {
+              "reason": {
+                "code": "ownership-artifact-mismatch"
+              }
+            },
+            "supportedFixes": [
+              "move the conflicting file aside, or choose a separate --out-dir, then rerun browser-check"
+            ]
+          }
+        ],
+        "containment": {
+          "status": "fail",
+          "policy": "fit-or-reader-declared-readable-vertical-scroll",
+          "viewports": []
+        },
+        "themeStates": {
+          "status": "fail",
+          "viewports": []
+        },
+        "readability": {
+          "status": "fail",
+          "minimumProjectedNodeTextPx": 6,
+          "viewports": []
+        },
+        "viewerChrome": {
+          "status": "fail",
+          "viewports": []
+        },
+        "captures": {
+          "status": "not-requested",
+          "screenshots": [],
+          "contactSheet": null
+        },
+        "sidecars": {
+          "receipt": "order-pos-flow.browser-check.json",
+          "files": []
+        },
+        "error": "browser-check will not replace the existing unowned evidence path \"E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.browser-check.json\"."
+      }
+    }
+  },
+  "browserCheck": {
+    "requested": true,
+    "ran": false
+  },
+  "diagnostics": [
+    {
+      "code": "viewer/evidence-path-conflict",
+      "severity": "error",
+      "message": "browser-check will not replace the existing unowned evidence path \"E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.browser-check.json\".",
+      "subject": {
+        "artifact": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.html",
+        "evidencePath": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.browser-check.json"
+      },
+      "evidence": {
+        "reason": {
+          "code": "ownership-artifact-mismatch"
+        }
+      },
+      "supportedFixes": [
+        "move the conflicting file aside, or choose a separate --out-dir, then rerun browser-check"
+      ]
+    }
+  ],
+  "evidence": {
+    "receipt": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.finalize.json",
+    "summaryReceipt": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.finalize-summary.json",
+    "browserCheckReceipt": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.browser-check.json"
+  },
+  "visualReview": "not-requested",
+  "failedStage": "browser-check",
+  "finishedAt": "2026-10-24T01:41:22.578Z",
+  "durationMs": 2313,
+  "update": {
+    "status": "current",
+    "installedVersion": "3.2.0",
+    "availableVersion": "3.2.0",
+    "releaseNotes": null,
+    "checkedAt": "2026-10-24T01:35:42.127Z",
+    "source": "cache",
+    "noticeRequired": false,
+    "noticeText": null
+  }
+}
