@@ -1,8 +1,11 @@
 import api from "../utils/axiosConfig";
 
-export const fetchCustomers = async (query = "") => {
-  const url = query ? `/customers?query=${encodeURIComponent(query)}` : "/customers";
-  const response = await api.get(url);
+export const fetchCustomers = async (query = "", page = 0, size = 20) => {
+  const params = {};
+  if (query && query.trim()) params.query = query.trim();
+  if (page !== undefined && page !== null) params.page = page;
+  if (size !== undefined && size !== null) params.size = size;
+  const response = await api.get("/customers", { params });
   return response.data;
 };
 

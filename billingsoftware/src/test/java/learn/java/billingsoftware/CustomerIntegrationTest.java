@@ -117,8 +117,8 @@ public class CustomerIntegrationTest {
                         .with(user("cashier").roles("USER"))
                         .param("query", "Van An"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$", hasSize(greaterThanOrEqualTo(1))))
-                .andExpect(jsonPath("$[0].name", is("Nguyen Van An")));
+                .andExpect(jsonPath("$.content", hasSize(greaterThanOrEqualTo(1))))
+                .andExpect(jsonPath("$.content[0].name", is("Nguyen Van An")));
     }
 
     @Test

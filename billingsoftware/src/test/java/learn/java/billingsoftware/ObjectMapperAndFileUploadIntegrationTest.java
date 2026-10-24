@@ -55,6 +55,7 @@ public class ObjectMapperAndFileUploadIntegrationTest {
         verify(s3Client).putObject(captor.capture(), any(RequestBody.class));
         assertFalse(captor.getValue().key().endsWith(".null"));
         assertFalse(captor.getValue().key().endsWith("."));
+        org.junit.jupiter.api.Assertions.assertNull(captor.getValue().acl());
     }
 
     @Test

@@ -7,11 +7,12 @@ import learn.java.billingsoftware.io.StockCheckRequest;
 import learn.java.billingsoftware.repository.*;
 import learn.java.billingsoftware.service.InventoryService;
 import learn.java.billingsoftware.service.ModifierGroupService;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.math.BigDecimal;
 import java.util.List;
@@ -20,7 +21,6 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
 @SpringBootTest
-@Transactional
 public class AuditLogCompletenessIntegrationTest {
 
     @Autowired
@@ -39,14 +39,21 @@ public class AuditLogCompletenessIntegrationTest {
     private VariantRepository variantRepository;
 
     @Autowired
+    private InventoryTransactionRepository inventoryTransactionRepository;
+
+    @Autowired
     private ActivityLogRepository activityLogRepository;
 
+    @Autowired
+    private JdbcTemplate jdbcTemplate;
+
+    private CategoryEntity testCategory;
     private ItemEntity testItem;
     private VariantEntity testVariant;
 
     @BeforeEach
     void setUp() {
-        CategoryEntity category = categoryRepository.save(CategoryEntity.builder()
+        testCategory = categoryRepository.save(CategoryEntity.builder()
                 .categoryId(UUID.randomUUID().toString())
                 .name("Cat-" + UUID.randomUUID())
                 .build());
@@ -55,7 +62,7 @@ public class AuditLogCompletenessIntegrationTest {
                 .itemId(UUID.randomUUID().toString())
                 .name("Test Item")
                 .price(BigDecimal.valueOf(100.0))
-                .category(category)
+                .category(testCategory)
                 .build());
 
         testVariant = variantRepository.save(VariantEntity.builder()
@@ -65,6 +72,15 @@ public class AuditLogCompletenessIntegrationTest {
                 .basePrice(BigDecimal.valueOf(100.0))
                 .cachedStockQuantity(0)
                 .build());
+    }
+
+    @AfterEach
+    void tearDown() {
+        jdbcTemplate.execute("DELETE FROM tbl_item_modifier_groups");
+        jdbcTemplate.execute("DELETE FROM tbl_inventory_transactions");
+        jdbcTemplate.execute("DELETE FROM tbl_variants");
+        jdbcTemplate.execute("DELETE FROM tbl_items");
+        jdbcTemplate.execute("DELETE FROM tbl_category");
     }
 
     @Test

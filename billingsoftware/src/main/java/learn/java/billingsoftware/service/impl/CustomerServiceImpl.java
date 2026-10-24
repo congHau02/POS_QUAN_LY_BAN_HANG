@@ -7,6 +7,8 @@ import learn.java.billingsoftware.repository.CustomerRepository;
 import learn.java.billingsoftware.service.ActivityLogService;
 import learn.java.billingsoftware.service.CustomerService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -62,6 +64,18 @@ public class CustomerServiceImpl implements CustomerService {
             list = customerRepository.findAllByOrderByCreatedAtDesc();
         }
         return list.stream().map(this::convertToResponse).collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<CustomerResponse> fetchCustomers(String query, Pageable pageable) {
+        Page<CustomerEntity> page;
+        if (query != null && !query.trim().isEmpty()) {
+            page = customerRepository.searchByNameOrPhoneNumber(query.trim(), pageable);
+        } else {
+            page = customerRepository.findAll(pageable);
+        }
+        return page.map(this::convertToResponse);
     }
 
     @Override

@@ -56,6 +56,7 @@ public class CategoryUpdateIntegrationTest {
     }
 
     @Test
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     @DisplayName("Admin can update category via JSON PUT and emits UPDATE activity log")
     void testUpdateCategoryJson() throws Exception {
         CategoryRequest initial = CategoryRequest.builder()
@@ -97,6 +98,7 @@ public class CategoryUpdateIntegrationTest {
     }
 
     @Test
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     @DisplayName("Admin can update category via multipart PUT with file and retains existing image when omitted")
     void testUpdateCategoryMultipart() throws Exception {
         CategoryRequest initial = CategoryRequest.builder()
@@ -140,6 +142,7 @@ public class CategoryUpdateIntegrationTest {
     }
 
     @Test
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     @DisplayName("Updating non-existent category returns 404")
     void testUpdateNonExistentCategory() throws Exception {
         CategoryRequest request = CategoryRequest.builder()

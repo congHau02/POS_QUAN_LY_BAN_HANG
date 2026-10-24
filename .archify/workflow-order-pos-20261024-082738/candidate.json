@@ -1,0 +1,430 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Sơ đồ Luồng Nghiệp vụ Xử lý Đơn hàng & Thanh toán (POS)",
+    "quality_profile": "standard",
+    "output": ".archify/workflow-order-pos-20261024-082738/order-pos-flow.html",
+    "repository": {
+      "url": "https://github.com/Hauhuhuhu/DEVOPS_TEST.git",
+      "revision": "aaad3a259963fe465fc06c847a1ce914fc2b95a9",
+      "provider": "github",
+      "link_mode": "web"
+    }
+  },
+  "lanes": [
+    { "id": "pos_ui", "label": "Giao diện Bán hàng (POS / Staff)" },
+    { "id": "order_svc", "label": "Xử lý Đơn hàng & Định giá (Backend)" },
+    { "id": "inventory_crm", "label": "Sổ cái Kho & CRM (Ledger & CRM)" },
+    { "id": "payment_recovery", "label": "Cổng PayOS & Bù trừ (Gateway & Recovery)", "variant": "exception" }
+  ],
+  "phases": [
+    { "id": "intake", "label": "1. Tiếp nhận & Kho", "fromCol": 0, "toCol": 1, "variant": "default" },
+    { "id": "payment", "label": "2. Phân luồng & PayOS", "fromCol": 2, "toCol": 3, "variant": "emphasis" },
+    { "id": "settle", "label": "3. Rẽ nhánh & Chốt đơn", "fromCol": 4, "toCol": 4, "variant": "security" }
+  ],
+  "groups": [
+    { "id": "grp_pos", "label": "Thu ngân", "lane": "pos_ui", "fromCol": 3, "toCol": 4, "variant": "default" },
+    { "id": "grp_recovery", "label": "Bù trừ kho", "lane": "payment_recovery", "fromCol": 2, "toCol": 4, "variant": "security" }
+  ],
+  "mainPath": [
+    "pos_cart",
+    "promo_calc",
+    "create_order",
+    "pay_router",
+    "order_complete",
+    "crm_accrue"
+  ],
+  "nodes": [
+    {
+      "id": "pos_cart",
+      "lane": "pos_ui",
+      "col": 0,
+      "type": "frontend",
+      "label": "Tạo giỏ hàng",
+      "icon": "frontend",
+      "sources": [
+        {
+          "path": "Front-end/src/features/Explore/CartSummary.jsx",
+          "line": 104,
+          "end_line": 120,
+          "label": "onCreateOrder"
+        }
+      ]
+    },
+    {
+      "id": "promo_calc",
+      "lane": "order_svc",
+      "col": 0,
+      "type": "backend",
+      "label": "Tính khuyến mãi",
+      "icon": "backend",
+      "sources": [
+        {
+          "path": "billingsoftware/src/main/java/learn/java/billingsoftware/service/impl/PromotionServiceImpl.java",
+          "line": 194,
+          "end_line": 215,
+          "label": "evaluatePromotion"
+        }
+      ]
+    },
+    {
+      "id": "create_order",
+      "lane": "order_svc",
+      "col": 1,
+      "type": "backend",
+      "label": "Khởi tạo đơn hàng",
+      "icon": "backend",
+      "sources": [
+        {
+          "path": "billingsoftware/src/main/java/learn/java/billingsoftware/service/impl/OrderServiceImpl.java",
+          "line": 71,
+          "end_line": 85,
+          "label": "createOrder"
+        }
+      ]
+    },
+    {
+      "id": "stock_out",
+      "lane": "inventory_crm",
+      "col": 1,
+      "type": "database",
+      "label": "Xuất kho tạm ứng",
+      "icon": "database",
+      "sources": [
+        {
+          "path": "billingsoftware/src/main/java/learn/java/billingsoftware/service/impl/OrderServiceImpl.java",
+          "line": 249,
+          "end_line": 276,
+          "label": "Inventory OUT"
+        }
+      ]
+    },
+    {
+      "id": "pay_router",
+      "lane": "order_svc",
+      "col": 2,
+      "type": "backend",
+      "label": "Phân luồng PTTT",
+      "icon": "decision",
+      "sources": [
+        {
+          "path": "billingsoftware/src/main/java/learn/java/billingsoftware/service/impl/OrderServiceImpl.java",
+          "line": 80,
+          "end_line": 88,
+          "label": "paymentMethod check"
+        }
+      ]
+    },
+    {
+      "id": "payos_call",
+      "lane": "payment_recovery",
+      "col": 2,
+      "type": "cloud",
+      "label": "Tạo link VietQR",
+      "icon": "cloud",
+      "sources": [
+        {
+          "path": "billingsoftware/src/main/java/learn/java/billingsoftware/service/impl/OrderServiceImpl.java",
+          "line": 88,
+          "end_line": 128,
+          "label": "paymentRequests.create"
+        }
+      ]
+    },
+    {
+      "id": "pos_qr_wait",
+      "lane": "pos_ui",
+      "col": 3,
+      "type": "frontend",
+      "label": "Hiển thị QR & Chờ",
+      "icon": "waiting",
+      "sources": [
+        {
+          "path": "Front-end/src/features/Payment/PaymentQRCode.jsx",
+          "line": 16,
+          "end_line": 39,
+          "label": "usePolledOrderData"
+        }
+      ]
+    },
+    {
+      "id": "webhook_verify",
+      "lane": "order_svc",
+      "col": 3,
+      "type": "security",
+      "label": "Xác thực Webhook",
+      "icon": "security",
+      "sources": [
+        {
+          "path": "billingsoftware/src/main/java/learn/java/billingsoftware/controller/PaymentWebhookController.java",
+          "line": 23,
+          "end_line": 36,
+          "label": "verify Webhook"
+        }
+      ]
+    },
+    {
+      "id": "compensate_engine",
+      "lane": "inventory_crm",
+      "col": 3,
+      "type": "security",
+      "label": "Bù trừ kho & Quota",
+      "icon": "security",
+      "sources": [
+        {
+          "path": "billingsoftware/src/main/java/learn/java/billingsoftware/service/impl/OrderServiceImpl.java",
+          "line": 527,
+          "end_line": 572,
+          "label": "compensatePendingOrder"
+        }
+      ]
+    },
+    {
+      "id": "order_pending",
+      "lane": "payment_recovery",
+      "col": 3,
+      "type": "backend",
+      "label": "Đơn chờ thanh toán",
+      "icon": "waiting",
+      "sources": [
+        {
+          "path": "billingsoftware/src/main/java/learn/java/billingsoftware/service/impl/OrderServiceImpl.java",
+          "line": 137,
+          "end_line": 154,
+          "label": "save PENDING"
+        }
+      ]
+    },
+    {
+      "id": "switch_cash",
+      "lane": "pos_ui",
+      "col": 4,
+      "type": "frontend",
+      "label": "Đổi sang tiền mặt",
+      "icon": "active",
+      "sources": [
+        {
+          "path": "billingsoftware/src/main/java/learn/java/billingsoftware/service/impl/OrderServiceImpl.java",
+          "line": 501,
+          "end_line": 525,
+          "label": "switchToCash"
+        }
+      ]
+    },
+    {
+      "id": "order_complete",
+      "lane": "order_svc",
+      "col": 4,
+      "type": "backend",
+      "label": "Đơn hàng hoàn tất",
+      "icon": "success",
+      "sources": [
+        {
+          "path": "billingsoftware/src/main/java/learn/java/billingsoftware/service/impl/OrderServiceImpl.java",
+          "line": 600,
+          "end_line": 631,
+          "label": "order completed"
+        }
+      ]
+    },
+    {
+      "id": "crm_accrue",
+      "lane": "inventory_crm",
+      "col": 4,
+      "type": "database",
+      "label": "Tích lũy CRM",
+      "icon": "database",
+      "sources": [
+        {
+          "path": "billingsoftware/src/main/java/learn/java/billingsoftware/service/impl/OrderServiceImpl.java",
+          "line": 633,
+          "end_line": 641,
+          "label": "accrueCustomerMetrics"
+        }
+      ]
+    },
+    {
+      "id": "order_cancelled",
+      "lane": "payment_recovery",
+      "col": 4,
+      "type": "security",
+      "label": "Hủy đơn & Đóng phiên",
+      "icon": "stop",
+      "sources": [
+        {
+          "path": "billingsoftware/src/main/java/learn/java/billingsoftware/service/impl/OrderServiceImpl.java",
+          "line": 476,
+          "end_line": 497,
+          "label": "cancelOrder"
+        }
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "id": "cart-promo",
+      "from": "pos_cart",
+      "to": "promo_calc",
+      "label": "gửi giỏ hàng",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "promo-order",
+      "from": "promo_calc",
+      "to": "create_order",
+      "label": "mã tối ưu",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "order-stock",
+      "from": "create_order",
+      "to": "stock_out",
+      "label": "xuất kho OUT",
+      "role": "branch",
+      "variant": "emphasis"
+    },
+    {
+      "id": "order-router",
+      "from": "create_order",
+      "to": "pay_router",
+      "label": "chọn PTTT",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "cash-complete",
+      "from": "pay_router",
+      "to": "order_complete",
+      "label": "Tiền mặt",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "complete-crm",
+      "from": "order_complete",
+      "to": "crm_accrue",
+      "label": "cộng CRM",
+      "role": "main",
+      "variant": "emphasis"
+    },
+    {
+      "id": "payos-branch",
+      "from": "pay_router",
+      "to": "payos_call",
+      "label": "VietQR PayOS",
+      "role": "branch",
+      "variant": "default"
+    },
+    {
+      "id": "payos-pending",
+      "from": "payos_call",
+      "to": "order_pending",
+      "label": "link VietQR",
+      "role": "branch",
+      "variant": "default"
+    },
+    {
+      "id": "pending-qr",
+      "from": "order_pending",
+      "to": "pos_qr_wait",
+      "label": "trả mã QR",
+      "role": "branch",
+      "variant": "default"
+    },
+    {
+      "id": "pending-webhook",
+      "from": "order_pending",
+      "to": "webhook_verify",
+      "label": "quét VietQR",
+      "role": "branch",
+      "variant": "default"
+    },
+    {
+      "id": "webhook-complete",
+      "from": "webhook_verify",
+      "to": "order_complete",
+      "label": "Code 00",
+      "role": "branch",
+      "variant": "emphasis"
+    },
+    {
+      "id": "qr-switch",
+      "from": "pos_qr_wait",
+      "to": "switch_cash",
+      "label": "đổi tiền mặt",
+      "role": "branch",
+      "variant": "dashed"
+    },
+    {
+      "id": "switch-complete",
+      "from": "switch_cash",
+      "to": "order_complete",
+      "label": "hoàn tất đơn",
+      "role": "branch",
+      "variant": "dashed"
+    },
+    {
+      "id": "payos-error",
+      "from": "payos_call",
+      "to": "compensate_engine",
+      "label": "lỗi cổng 502",
+      "role": "error",
+      "variant": "security"
+    },
+    {
+      "id": "pending-cancel",
+      "from": "order_pending",
+      "to": "compensate_engine",
+      "label": "hủy / quá hạn",
+      "role": "error",
+      "variant": "security"
+    },
+    {
+      "id": "compensate-cancel",
+      "from": "compensate_engine",
+      "to": "order_cancelled",
+      "label": "đóng phiên",
+      "role": "error",
+      "variant": "security"
+    },
+    {
+      "id": "compensate-stock",
+      "from": "compensate_engine",
+      "to": "stock_out",
+      "label": "hoàn kho IN",
+      "role": "return",
+      "variant": "dashed",
+      "toSide": "bottom"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "emerald",
+      "title": "Luồng Chính (Happy Path)",
+      "items": [
+        "Tiền mặt (CASH): Tạo đơn và hoàn tất ngay lập tức (COMPLETED), xuất kho qua Ledger OUT và tích lũy doanh số khách hàng.",
+        "Chuyển khoản (PAYOS VietQR): Tạo payment link ngoài DB Tx, giữ hàng tạm ứng trong kho đệm và chờ xác thực thanh toán."
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "Cơ Chế Bù Trừ Toàn Diện (Compensating Transactions)",
+      "items": [
+        "Khi cổng PayOS lỗi kết nối (502) hoặc khách bấm Hủy đơn: Kích hoạt giao dịch sổ cái IN để bù hoàn tồn kho về số lượng ban đầu.",
+        "Tự động hoàn lại số lần sử dụng của mã Coupon (decrementTimesUsed) và gửi lệnh hủy Payment Link trên máy chủ PayOS."
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "Bất Biến & Rẽ Nhánh Nghiệp Vụ (Business Invariants)",
+      "items": [
+        "Đổi sang Tiền mặt (Switch to Cash): Hủy link PayOS và chuyển trạng thái sang COMPLETED mà KHÔNG nhân đôi trừ kho hay hoàn kho.",
+        "Tuyệt đối cấm xóa đơn đã COMPLETED; đơn PENDING bị xóa bắt buộc phải bù trừ toàn bộ trước khi xóa bản ghi.",
+        "Chỉ số CRM (điểm tích lũy, tổng chi tiêu) chỉ được ghi nhận một lần duy nhất khi đơn hàng đạt trạng thái COMPLETED."
+      ]
+    }
+  ]
+}

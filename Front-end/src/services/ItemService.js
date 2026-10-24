@@ -1,7 +1,8 @@
 import api from "../utils/axiosConfig";
 
 export const addItem = async (item) => {
-  return await api.post("/admin/items", item);
+  const response = await api.post("/admin/items", item);
+  return response.data;
 };
 
 export const updateItem = async (itemId, itemData) => {
@@ -14,7 +15,8 @@ export const updateItem = async (itemId, itemData) => {
 };
 
 export const deleteItem = async (itemId) => {
-  return await api.delete(`/admin/items/${itemId}`);
+  const response = await api.delete(`/admin/items/${itemId}`);
+  return response.data;
 };
 
 export const fetchItems = async () => {
@@ -31,4 +33,3 @@ export const fetchItemModifierGroups = async (itemId) => {
   const response = await api.get(`/items/${itemId}/modifier-groups`);
   return response.data;
 };
-

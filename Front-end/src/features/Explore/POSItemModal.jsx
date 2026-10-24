@@ -1,5 +1,11 @@
 import { useState } from "react";
+import toast from "react-hot-toast";
 import { formatCurrency } from "../../utils/formatCurrency";
+import {
+  isModifierGroupMandatory,
+  validateModifierSelections,
+  getModifierGroupBadgeText,
+} from "../../utils/modifierValidation";
 import { X, Minus, Plus } from "lucide-react";
 
 function POSItemModal({ item, isOpen, onClose, onAddToCart }) {
@@ -58,10 +64,12 @@ function POSItemModal({ item, isOpen, onClose, onAddToCart }) {
     setSelectedModifiersMap((prev) => {
       const currentSelected = new Set(prev[group.groupId] || []);
       const isSingleSelect = group.maxSelections === 1;
+      const isMandatory = isModifierGroupMandatory(group);
 
       if (isSingleSelect) {
         if (currentSelected.has(modifier.modifierId)) {
-          if (group.minSelections === 0) {
+          // Allow deselecting single-choice only if group is not mandatory
+          if (!isMandatory) {
             currentSelected.clear();
           }
         } else {
@@ -87,6 +95,17 @@ function POSItemModal({ item, isOpen, onClose, onAddToCart }) {
   };
 
   const handleAdd = () => {
+    if (hasModifiers && item.modifierGroups) {
+      const validation = validateModifierSelections(
+        item.modifierGroups,
+        selectedModifiersMap
+      );
+      if (!validation.isValid) {
+        toast.error(validation.errorMessage);
+        return;
+      }
+    }
+
     const variantLabel = activeVariant?.attributes
       ? Object.entries(activeVariant.attributes)
           .map(([k, v]) => `${k}: ${v}`)
@@ -226,17 +245,32 @@ function POSItemModal({ item, isOpen, onClose, onAddToCart }) {
                 const selectedSet =
                   selectedModifiersMap[group.groupId] || new Set();
                 const isSingleSelect = group.maxSelections === 1;
+                const isMandatory = isModifierGroupMandatory(group);
+                const badgeText = getModifierGroupBadgeText(group);
+                const isUnmet =
+                  isMandatory && selectedSet.size < Number(group.minSelections);
 
                 return (
                   <div
                     key={group.groupId}
-                    className="p-3.5 rounded-xl bg-slate-50 border border-slate-200 space-y-2"
+                    className={`p-3.5 rounded-xl border space-y-2 transition-colors ${
+                      isUnmet
+                        ? "bg-amber-50/30 border-amber-300"
+                        : "bg-slate-50 border-slate-200"
+                    }`}
                   >
-                    <div className="flex justify-between items-center">
-                      <span className="text-xs font-bold text-slate-800">
-                        {group.name}
-                      </span>
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-200 text-slate-700">
+                    <div className="flex justify-between items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-bold text-slate-800">
+                          {group.name}
+                        </span>
+                        {badgeText && (
+                          <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                            {badgeText}
+                          </span>
+                        )}
+                      </div>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-slate-200 text-slate-700 shrink-0">
                         {isSingleSelect
                           ? "Chọn 1"
                           : `Tối đa ${group.maxSelections || "không giới hạn"}`}

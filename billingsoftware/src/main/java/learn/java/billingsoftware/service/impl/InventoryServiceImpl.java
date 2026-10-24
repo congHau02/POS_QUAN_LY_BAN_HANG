@@ -11,6 +11,8 @@ import learn.java.billingsoftware.repository.VariantRepository;
 import learn.java.billingsoftware.service.ActivityLogService;
 import learn.java.billingsoftware.service.InventoryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -92,8 +94,9 @@ public class InventoryServiceImpl implements InventoryService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Variant not found with ID: " + request.getVariantId()));
 
-        int currentStock = variant.getCachedStockQuantity() != null ? variant.getCachedStockQuantity() : 0;
-        int discrepancy = request.getActualCount() - currentStock;
+        Integer ledgerStock = inventoryTransactionRepository.calculateStockByVariantId(variant.getVariantId());
+        int currentLedgerStock = ledgerStock != null ? ledgerStock : 0;
+        int discrepancy = request.getActualCount() - currentLedgerStock;
 
         String refId = (request.getReferenceId() != null && !request.getReferenceId().trim().isEmpty())
                 ? request.getReferenceId().trim()
@@ -144,6 +147,13 @@ public class InventoryServiceImpl implements InventoryService {
                 .stream()
                 .map(tx -> convertToResponse(tx, null))
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<InventoryTransactionResponse> getAllTransactions(Pageable pageable) {
+        return inventoryTransactionRepository.findAll(pageable)
+                .map(tx -> convertToResponse(tx, null));
     }
 
     private InventoryTransactionResponse convertToResponse(InventoryTransactionEntity entity, Integer balanceAfter) {

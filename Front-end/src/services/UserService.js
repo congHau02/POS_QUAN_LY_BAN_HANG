@@ -1,10 +1,13 @@
 import api from "../utils/axiosConfig";
 
 export const addUser = async (user) => {
-  return await api.post("/admin/register", user);
+  const response = await api.post("/admin/register", user);
+  return response.data;
 };
+
 export const deleteUser = async (userId) => {
-  return await api.delete(`/admin/users/${userId}`);
+  const response = await api.delete(`/admin/users/${userId}`);
+  return response.data;
 };
 
 export const fetchUsers = async () => {

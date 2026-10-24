@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { useCreateOrder } from "../Orders/useCreateOrder";
 import PaymentQRCode from "../Payment/PaymentQRCode";
@@ -14,6 +14,8 @@ import {
 } from "../Promotions/usePromotionEvaluation";
 import { useCartCalculations } from "./useCartCalculations";
 import { getPromotionErrorMessage } from "../../utils/promotionErrorMessages";
+import { buildCustomerOrderPayload } from "../../utils/customerSync";
+import { getOrderStatus } from "../Payment/orderTerminalState";
 import { Tag, Banknote, CreditCard, X } from "lucide-react";
 
 function CartSummary({
@@ -24,10 +26,6 @@ function CartSummary({
 }) {
   const queryClient = useQueryClient();
   const { isCreating, createOrder, orderData } = useCreateOrder();
-
-  const customerName = customer?.customerName || "";
-  const mobileNumber = customer?.mobileNumber || "";
-  const customerId = customer?.customerId || null;
 
   const [showModal, setShowModal] = useState(false);
   const [completedCashOrder, setCompletedCashOrder] = useState(null);
@@ -105,11 +103,10 @@ function CartSummary({
 
   function onCreateOrder(paymentMode) {
     const formattedCartItems = formatCartItems(cartItems);
+    const customerPayload = buildCustomerOrderPayload(customer);
 
     const dataForm = {
-      customerId: customerId || null,
-      customerName: customerName.trim() || "Người dùng mặc định",
-      phoneNumber: mobileNumber.trim() || "0000000000",
+      ...customerPayload,
       cartItems: formattedCartItems,
       subtotal,
       discountAmount,
@@ -141,14 +138,24 @@ function CartSummary({
     });
   }
 
-  function handleClearCart() {
+  const handleClearCart = useCallback(() => {
     if (onClearCustomer) {
       onClearCustomer();
     }
     setCouponInput("");
     setAppliedCoupon("");
     clearCart();
-  }
+  }, [onClearCustomer, clearCart]);
+
+  const handleClosePayOSModal = useCallback(() => {
+    setShowModal(false);
+    const activeId = orderData?.orderId || orderData?.data?.orderId;
+    const cachedData = queryClient.getQueryData(["order", activeId]);
+    const status = getOrderStatus(cachedData) || getOrderStatus(orderData);
+    if (status === "COMPLETED") {
+      handleClearCart();
+    }
+  }, [orderData, queryClient, handleClearCart]);
 
   return (
     <div className="space-y-3">
@@ -290,30 +297,14 @@ function CartSummary({
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div 
             className="fixed inset-0 bg-slate-900/60 backdrop-blur-xs"
-            onClick={() => {
-              setShowModal(false);
-              const activeId = orderData?.orderId || orderData?.data?.orderId;
-              const cachedData = queryClient.getQueryData(["order", activeId]);
-              const status = cachedData?.paymentDetails?.status || cachedData?.data?.paymentDetails?.status || orderData?.paymentDetails?.status || orderData?.data?.paymentDetails?.status;
-              if (status === "COMPLETED") {
-                handleClearCart();
-              }
-            }}
+            onClick={handleClosePayOSModal}
           />
 
           <div className="relative w-full max-w-md bg-white rounded-2xl shadow-xl border border-slate-200 overflow-hidden z-10 p-5">
             <button
               type="button"
               className="absolute top-4 right-4 p-1.5 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors cursor-pointer"
-              onClick={() => {
-                setShowModal(false);
-                const activeId = orderData?.orderId || orderData?.data?.orderId;
-                const cachedData = queryClient.getQueryData(["order", activeId]);
-                const status = cachedData?.paymentDetails?.status || cachedData?.data?.paymentDetails?.status || orderData?.paymentDetails?.status || orderData?.data?.paymentDetails?.status;
-                if (status === "COMPLETED") {
-                  handleClearCart();
-                }
-              }}
+              onClick={handleClosePayOSModal}
               aria-label="Đóng"
             >
               <X size={18} />

@@ -10,8 +10,9 @@ export const fetchVariantTransactions = async (variantId) => {
   return response.data;
 };
 
-export const fetchRecentTransactions = async () => {
-  const response = await api.get("/admin/inventory/transactions");
+export const fetchRecentTransactions = async (page = 0, size = 20) => {
+  const params = { page, size };
+  const response = await api.get("/admin/inventory/transactions", { params });
   return response.data;
 };
 

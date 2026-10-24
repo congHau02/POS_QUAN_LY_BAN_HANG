@@ -1,12 +1,11 @@
-
 package learn.java.billingsoftware.config;
 
 import learn.java.billingsoftware.filter.JwtRequestFilter;
 import learn.java.billingsoftware.service.impl.AppUserDetailsService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
-import org.springframework.http.HttpMethod;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
@@ -19,14 +18,11 @@ import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
-import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.authentication.HttpStatusEntryPoint;
+import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
-import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 import org.springframework.web.cors.CorsConfigurationSource;
-import org.springframework.web.filter.CorsFilter;
-
-import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import java.util.Arrays;
 import java.util.List;
@@ -47,7 +43,7 @@ public class SecurityConfig {
         httpSecurity.cors(Customizer.withDefaults())
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/login", "/auth/refresh", "/auth/logout", "/payos/**", "/uploads/**").permitAll()
+                        .requestMatchers("/login", "/auth/refresh", "/auth/logout", "/payos/**").permitAll()
                         .requestMatchers("/categories", "/items/**", "/orders", "/orders/**", "/dashboard", "/modifier-groups/**", "/inventory/**", "/customers", "/customers/**", "/promotions", "/promotions/**", "/activity-logs", "/activity-logs/**").hasAnyRole("USER", "ADMIN")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
@@ -64,10 +60,6 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    @Bean
-    public CorsFilter corsFilter() {
-        return new CorsFilter(corsConfigurationSource());
-    }
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();

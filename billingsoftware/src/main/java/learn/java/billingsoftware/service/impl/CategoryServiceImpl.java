@@ -67,6 +67,11 @@ public class CategoryServiceImpl implements CategoryService {
     public void delete(String categoryId) {
         CategoryEntity existingCategory = categoryRepository.findByCategoryId(categoryId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Category not found: " + categoryId));
+
+        Integer itemCount = itemRepository.countByCategoryId(existingCategory.getId());
+        if (itemCount != null && itemCount > 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Không thể xóa danh mục đang chứa " + itemCount + " sản phẩm");
+        }
         boolean isFileDelete = true;
         if (existingCategory.getImgUrl() != null && !existingCategory.getImgUrl().trim().isEmpty()) {
             isFileDelete = fileUploadService.deleteFile(existingCategory.getImgUrl());

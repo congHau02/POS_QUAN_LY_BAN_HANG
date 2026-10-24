@@ -1,0 +1,17 @@
+{
+  "schemaVersion": 1,
+  "receiptId": "294ee129-07a1-4841-af39-bd7c3c5bf5b5",
+  "status": "current",
+  "command": "deliver",
+  "type": "workflow",
+  "input": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\candidate.json",
+  "output": "E:\\Learn JavaSpringBoot with ReactJs\\Billing-app\\.archify\\workflow-order-pos-20261024-082738\\order-pos-flow.html",
+  "specification": {
+    "sha256": "5c3882d45536beb3b36d5cd9ac44ea6ac08ab6a0370ca346d68d8060b4e68b96",
+    "bytes": 12132
+  },
+  "artifact": {
+    "sha256": "a93b0f19a64695f6348e490ccb04ea9f98a428213f8276258b48b41c167961f4",
+    "bytes": 846235
+  }
+}

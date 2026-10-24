@@ -35,9 +35,11 @@ import learn.java.billingsoftware.repository.VariantRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Pageable;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionTemplate;
 import java.math.BigDecimal;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -57,6 +59,7 @@ public class OrderServiceImpl implements OrderService {
     private final CustomerRepository customerRepository;
     private final ActivityLogService activityLogService;
     private final ObjectMapper objectMapper;
+    private final TransactionTemplate transactionTemplate;
 
     @Value("${payos.return-url:http://localhost:5173/payment/success}")
     private String payosReturnUrl;
@@ -65,8 +68,95 @@ public class OrderServiceImpl implements OrderService {
     private String payosCancelUrl;
 
     @Override
-    @Transactional
     public OrderResponse createOrder(OrderRequest request) {
+        // Phase 1: Isolated database transaction to persist initial order & inventory OUT ledger
+        OrderEntity initialOrder = transactionTemplate.execute(status -> persistInitialOrder(request));
+
+        if (initialOrder == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Không thể khởi tạo đơn hàng");
+        }
+
+        // If payment method is CASH, complete immediately without gateway interaction
+        if (initialOrder.getPaymentMethod() == PaymentMethod.CASH) {
+            activityLogService.logActivity("CREATE", "ORDER", initialOrder.getOrderId(),
+                    "Created order #" + initialOrder.getOrderId() + " (" + initialOrder.getGrandTotal() + " VND)");
+            return convertToResponse(initialOrder);
+        }
+
+        // Phase 2: Remote gateway call executed strictly OUTSIDE of database transactions
+        CreatePaymentLinkResponse payOSResponse;
+        try {
+            long orderCode = initialOrder.getId();
+            double discountAmount = initialOrder.getDiscountAmount() != null ? initialOrder.getDiscountAmount() : 0.0;
+            double tax = initialOrder.getTax() != null ? initialOrder.getTax() : 0.0;
+            long grandTotal = initialOrder.getGrandTotal() != null ? Math.round(initialOrder.getGrandTotal()) : 0L;
+
+            List<OrderItemEntity> orderItems = initialOrder.getItems() != null ? initialOrder.getItems() : Collections.emptyList();
+            long rawItemsTotal = orderItems.stream()
+                    .mapToLong(item -> (item.getPrice() != null ? Math.round(item.getPrice()) : 0L) * (item.getQuantity() != null ? item.getQuantity() : 1))
+                    .sum();
+
+            List<PaymentLinkItem> payOSItems;
+            if (rawItemsTotal != grandTotal || discountAmount > 0.0 || tax > 0.0 || orderItems.isEmpty()) {
+                // When discounts, taxes, or adjustments alter item sums, or for empty carts,
+                // submit a single aggregated item to ensure PayOS line-item amount balance
+                payOSItems = List.of(PaymentLinkItem.builder()
+                        .name("Don hang #" + orderCode)
+                        .price(grandTotal)
+                        .quantity(1)
+                        .build());
+            } else {
+                // When no discounts or taxes alter item sums, retain full itemized breakdown
+                payOSItems = orderItems.stream()
+                        .map(item -> PaymentLinkItem.builder()
+                                .name(item.getName())
+                                .price(item.getPrice() != null ? Math.round(item.getPrice()) : 0L)
+                                .quantity(item.getQuantity() != null ? item.getQuantity() : 1)
+                                .build())
+                        .collect(Collectors.toList());
+            }
+
+            CreatePaymentLinkRequest paymentRequest = CreatePaymentLinkRequest.builder()
+                    .orderCode(orderCode)
+                    .amount(grandTotal)
+                    .description(formatPayOsDescription(initialOrder, orderCode))
+                    .returnUrl(payosReturnUrl)
+                    .cancelUrl(payosCancelUrl)
+                    .items(payOSItems)
+                    .build();
+
+            payOSResponse = payOS.paymentRequests().create(paymentRequest);
+        } catch (Exception e) {
+            log.error("PayOS gateway call failed for order #{}: {}", initialOrder.getOrderId(), e.getMessage());
+            // Phase 3b: Automated error reversal (compensate pending order & mark CANCELLED) in an isolated transaction
+            compensateAndCancelOrder(initialOrder, e.getMessage());
+            throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "Lỗi khi tạo mã thanh toán PayOS: " + e.getMessage(), e);
+        }
+
+        // Phase 3a: Success - update payment link details in an isolated transaction
+        OrderEntity updatedOrder = transactionTemplate.execute(status -> {
+            OrderEntity order = orderEntityRepository.findByOrderId(initialOrder.getOrderId())
+                    .orElse(initialOrder);
+            PaymentDetails paymentDetails = order.getPaymentDetails();
+            if (paymentDetails == null) {
+                paymentDetails = new PaymentDetails();
+                order.setPaymentDetails(paymentDetails);
+            }
+            paymentDetails.setPaymentLinkId(payOSResponse.getPaymentLinkId());
+            paymentDetails.setCheckoutUrl(payOSResponse.getCheckoutUrl());
+            paymentDetails.setQrCode(payOSResponse.getQrCode());
+            paymentDetails.setOrderId(order.getOrderId());
+
+            OrderEntity saved = orderEntityRepository.save(order);
+            activityLogService.logActivity("CREATE", "ORDER", saved.getOrderId(),
+                    "Created order #" + saved.getOrderId() + " (" + saved.getGrandTotal() + " VND)");
+            return saved;
+        });
+
+        return convertToResponse(updatedOrder != null ? updatedOrder : initialOrder);
+    }
+
+    private OrderEntity persistInitialOrder(OrderRequest request) {
         // 1. Server-side Promotion Evaluation & Totals Recalculation
         List<EvaluationCartItem> evalCartItems = new ArrayList<>();
         if (request.getCartItems() != null) {
@@ -113,11 +203,11 @@ public class OrderServiceImpl implements OrderService {
             newOrder.setCustomerName(customer.getName());
             newOrder.setPhoneNumber(customer.getPhoneNumber());
 
-            int updatedOrderCount = (customer.getOrderCount() != null ? customer.getOrderCount() : 0) + 1;
-            customer.setOrderCount(updatedOrderCount);
-            double currentSpent = customer.getTotalSpent() != null ? customer.getTotalSpent() : 0.0;
-            customer.setTotalSpent(currentSpent + (newOrder.getGrandTotal() != null ? newOrder.getGrandTotal() : 0.0));
-            customerRepository.save(customer);
+            // Accrue customer metrics immediately only when payment method is CASH (order is COMPLETED upon creation)
+            if (newOrder.getPaymentMethod() == PaymentMethod.CASH) {
+                customer.accrueOrderSpending(newOrder.getGrandTotal());
+                customerRepository.save(customer);
+            }
         } else {
             newOrder.setCustomerId(null);
             if (newOrder.getCustomerName() == null || newOrder.getCustomerName().trim().isEmpty()) {
@@ -129,14 +219,11 @@ public class OrderServiceImpl implements OrderService {
         }
 
         // 4. Atomic Promotion Usage Counter Increment & Limit Enforcement
-        if (evalResponse.getAppliedPromotionId() != null) {
-            PromotionEntity promo = promotionRepository.findByPromotionId(evalResponse.getAppliedPromotionId()).orElse(null);
-            if (promo != null) {
-                if (promo.getUsageLimit() != null && promo.getTimesUsed() != null && promo.getTimesUsed() >= promo.getUsageLimit()) {
-                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mã giảm giá đã đạt giới hạn lượt sử dụng");
-                }
-                promo.setTimesUsed((promo.getTimesUsed() != null ? promo.getTimesUsed() : 0) + 1);
-                promotionRepository.save(promo);
+        String appliedPromotionId = evalResponse.getAppliedPromotionId();
+        if (appliedPromotionId != null && !appliedPromotionId.trim().isEmpty()) {
+            int updatedRows = promotionRepository.incrementTimesUsedIfUnderLimit(appliedPromotionId.trim());
+            if (updatedRows == 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Mã giảm giá đã đạt giới hạn lượt sử dụng");
             }
         }
 
@@ -182,52 +269,32 @@ public class OrderServiceImpl implements OrderService {
                         .build();
                 inventoryTransactionRepository.saveAndFlush(transaction);
 
-                Integer updatedStock = inventoryTransactionRepository.calculateStockByVariantId(variant.getVariantId());
-                variant.setCachedStockQuantity(updatedStock != null ? updatedStock : 0);
+                int currentStock = variant.getCachedStockQuantity() != null ? variant.getCachedStockQuantity() : 0;
+                variant.setCachedStockQuantity(currentStock - soldQuantity);
                 variantRepository.save(variant);
             }
         }
 
-        // 8. PayOS Payment Link handling
-        if (newOrder.getPaymentMethod() == PaymentMethod.PAYOS) {
-            try {
-                long orderCode = newOrder.getId();
+        return newOrder;
+    }
 
-                List<PaymentLinkItem> payOSItems = newOrder.getItems().stream()
-                        .map(item -> PaymentLinkItem.builder()
-                                .name(item.getName())
-                                .price(item.getPrice().longValue())
-                                .quantity(item.getQuantity())
-                                .build())
-                        .collect(Collectors.toList());
+    private void compensateAndCancelOrder(OrderEntity initialOrder, String failureReason) {
+        transactionTemplate.executeWithoutResult(status -> {
+            OrderEntity order = orderEntityRepository.findByOrderId(initialOrder.getOrderId())
+                    .orElse(initialOrder);
 
-                CreatePaymentLinkRequest paymentRequest = CreatePaymentLinkRequest.builder()
-                        .orderCode(orderCode)
-                        .amount(newOrder.getGrandTotal().longValue())
-                        .description("Thanh toan don " + orderCode)
-                        .returnUrl(payosReturnUrl)
-                        .cancelUrl(payosCancelUrl)
-                        .items(payOSItems)
-                        .build();
-
-                CreatePaymentLinkResponse payOSResponse = payOS.paymentRequests().create(paymentRequest);
-
-                newOrder.getPaymentDetails().setPaymentLinkId(payOSResponse.getPaymentLinkId());
-                newOrder.getPaymentDetails().setCheckoutUrl(payOSResponse.getCheckoutUrl());
-                newOrder.getPaymentDetails().setQrCode(payOSResponse.getQrCode());
-                newOrder.getPaymentDetails().setOrderId(newOrder.getOrderId());
-
-                orderEntityRepository.save(newOrder);
-
-            } catch (PayOSException e) {
-                throw new RuntimeException("Lỗi khi tạo mã thanh toán PayOS: " + e.getMessage(), e);
-            } catch (Exception e) {
-                throw new RuntimeException("Lỗi khi tạo mã thanh toán PayOS: " + e.getMessage(), e);
+            PaymentDetails paymentDetails = order.getPaymentDetails();
+            if (paymentDetails == null) {
+                paymentDetails = new PaymentDetails();
+                order.setPaymentDetails(paymentDetails);
             }
-        }
+            paymentDetails.setStatus(PaymentDetails.PaymentStatus.CANCELLED);
 
-        activityLogService.logActivity("CREATE", "ORDER", newOrder.getOrderId(), "Created order #" + newOrder.getOrderId() + " (" + newOrder.getGrandTotal() + " VND)");
-        return convertToResponse(newOrder);
+            compensatePendingOrder(order, "Auto-Reversal PayOS Failure - Order #" + order.getOrderId(), "Lỗi cổng thanh toán PayOS");
+            orderEntityRepository.save(order);
+            activityLogService.logActivity("CANCEL", "ORDER", order.getOrderId(),
+                    "Auto-cancelled order #" + order.getOrderId() + " due to PayOS failure: " + failureReason);
+        });
     }
 
     private OrderItemEntity convertToOrderItemEntity(OrderRequest.OrderItemRequest orderItemRequest) {
@@ -248,6 +315,14 @@ public class OrderServiceImpl implements OrderService {
                 .quantity(orderItemRequest.getQuantity())
                 .selectedModifiers(modifiersJson)
                 .build();
+    }
+
+    private String formatPayOsDescription(OrderEntity order, long fallbackOrderCode) {
+        String code = order.getOrderId();
+        if (code == null || code.trim().isEmpty()) {
+            return "ORD" + fallbackOrderCode;
+        }
+        return code.length() > 25 ? code.substring(0, 25) : code;
     }
 
     private OrderResponse convertToResponse(OrderEntity newOrder) {
@@ -336,10 +411,7 @@ public class OrderServiceImpl implements OrderService {
     @Override
     @Transactional(readOnly = true)
     public List<OrderResponse> getLatestOrders() {
-        return orderEntityRepository.findAllByOrderByCreatedAtDesc() 
-                .stream() 
-                .map(this::convertToResponse) 
-                .collect(Collectors.toList()); 
+        return findRecentOrders(10);
     }
 
     @Override
@@ -443,6 +515,9 @@ public class OrderServiceImpl implements OrderService {
         paymentDetails.setStatus(PaymentDetails.PaymentStatus.COMPLETED);
         order.setPaymentDetails(paymentDetails);
 
+        // 3. Accrue customer metrics upon settling with cash
+        accrueCustomerMetricsIfPresent(order);
+
         order = orderEntityRepository.save(order);
         activityLogService.logActivity("UPDATE", "ORDER", order.getOrderId(), "Switched payment method to CASH for order #" + order.getOrderId());
 
@@ -475,30 +550,22 @@ public class OrderServiceImpl implements OrderService {
                             .build();
                     inventoryTransactionRepository.saveAndFlush(transaction);
 
-                    Integer updatedStock = inventoryTransactionRepository.calculateStockByVariantId(variant.getVariantId());
-                    variant.setCachedStockQuantity(updatedStock != null ? updatedStock : 0);
+                    int currentStock = variant.getCachedStockQuantity() != null ? variant.getCachedStockQuantity() : 0;
+                    variant.setCachedStockQuantity(currentStock + quantityToRevert);
                     variantRepository.save(variant);
                 }
             }
         }
 
         // 2. Hoàn lại quota Promotion nếu có áp dụng
-        if (order.getPromotionId() != null && !order.getPromotionId().trim().isEmpty()) {
-            PromotionEntity promo = promotionRepository.findByPromotionId(order.getPromotionId()).orElse(null);
-            if (promo != null && promo.getTimesUsed() != null && promo.getTimesUsed() > 0) {
-                promo.setTimesUsed(promo.getTimesUsed() - 1);
-                promotionRepository.save(promo);
-            }
+        String appliedPromoId = order.getPromotionId();
+        if (appliedPromoId != null && !appliedPromoId.trim().isEmpty()) {
+            promotionRepository.decrementTimesUsed(appliedPromoId.trim());
         }
 
-        // 3. Hoàn lại số liệu CRM của khách hàng nếu có
-        if (order.getCustomerId() != null && !order.getCustomerId().trim().isEmpty()) {
-            CustomerEntity customer = customerRepository.findByCustomerId(order.getCustomerId()).orElse(null);
-            if (customer != null) {
-                customer.revertOrderSpending(order.getGrandTotal());
-                customerRepository.save(customer);
-            }
-        }
+        // 3. Customer CRM metrics: Skipped for PENDING orders (Ticket 04)
+        // Loyalty metrics (totalSpent, orderCount) are accrued strictly upon COMPLETED payment status,
+        // so cancelling/deleting an in-flight PENDING order requires no reversal.
 
         // 4. Hủy liên kết PayOS từ xa nếu là PAYOS
         cancelRemotePayOSPayment(order, payosCancelReason);
@@ -506,6 +573,9 @@ public class OrderServiceImpl implements OrderService {
 
     private void cancelRemotePayOSPayment(OrderEntity order, String reason) {
         if (order.getPaymentMethod() == PaymentMethod.PAYOS) {
+            if (order.getPaymentDetails() != null && order.getPaymentDetails().getPaymentLinkId() == null) {
+                return;
+            }
             try {
                 payOS.paymentRequests().cancel(order.getId(), reason);
             } catch (Exception e) {
@@ -531,8 +601,19 @@ public class OrderServiceImpl implements OrderService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Không tìm thấy đơn hàng với orderCode: " + orderCode));
 
         PaymentDetails paymentDetails = order.getPaymentDetails();
-        if (paymentDetails != null && paymentDetails.getStatus() == PaymentDetails.PaymentStatus.COMPLETED) {
-            log.info("Order #{} is already COMPLETED. Ignoring redundant webhook delivery.", order.getOrderId());
+        if (paymentDetails != null) {
+            if (paymentDetails.getStatus() == PaymentDetails.PaymentStatus.COMPLETED) {
+                log.info("Order #{} is already COMPLETED. Ignoring redundant webhook delivery.", order.getOrderId());
+                return;
+            }
+            if (paymentDetails.getStatus() == PaymentDetails.PaymentStatus.CANCELLED) {
+                log.warn("Order #{} has already been CANCELLED. Ignoring late webhook delivery.", order.getOrderId());
+                return;
+            }
+        }
+
+        if (!"00".equals(data.getCode())) {
+            log.warn("PayOS Webhook reported non-success code {} for orderCode={}", data.getCode(), orderCode);
             return;
         }
 
@@ -542,7 +623,20 @@ public class OrderServiceImpl implements OrderService {
         }
         paymentDetails.setStatus(PaymentDetails.PaymentStatus.COMPLETED);
 
+        // Accrue customer metrics upon successful PayOS transaction confirmation
+        accrueCustomerMetricsIfPresent(order);
+
         orderEntityRepository.save(order);
         activityLogService.logActivity("PayOS-Webhook", "UPDATE", "ORDER", order.getOrderId(), "Payment confirmed via PayOS Webhook for order #" + order.getOrderId());
+    }
+
+    private void accrueCustomerMetricsIfPresent(OrderEntity order) {
+        if (order.getCustomerId() != null && !order.getCustomerId().trim().isEmpty()) {
+            CustomerEntity customer = customerRepository.findByCustomerId(order.getCustomerId().trim()).orElse(null);
+            if (customer != null) {
+                customer.accrueOrderSpending(order.getGrandTotal());
+                customerRepository.save(customer);
+            }
+        }
     }
 }

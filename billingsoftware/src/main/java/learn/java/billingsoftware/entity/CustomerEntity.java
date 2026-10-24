@@ -46,6 +46,13 @@ public class CustomerEntity {
     @UpdateTimestamp
     private Timestamp updatedAt;
 
+    public void accrueOrderSpending(Double orderTotal) {
+        this.orderCount = (this.orderCount != null ? this.orderCount : 0) + 1;
+        double currentSpent = this.totalSpent != null ? this.totalSpent : 0.0;
+        double amountToAdd = orderTotal != null ? orderTotal : 0.0;
+        this.totalSpent = currentSpent + amountToAdd;
+    }
+
     public void revertOrderSpending(Double orderTotal) {
         if (this.orderCount != null && this.orderCount > 0) {
             this.orderCount--;

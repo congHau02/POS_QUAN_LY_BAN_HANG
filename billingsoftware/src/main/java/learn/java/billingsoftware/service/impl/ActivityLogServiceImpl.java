@@ -14,6 +14,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
@@ -31,6 +32,7 @@ public class ActivityLogServiceImpl implements ActivityLogService {
     private final ActivityLogRepository activityLogRepository;
 
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logActivity(String userEmail, String action, String entityType, String entityId, String description) {
         try {
             String effectiveEmail = userEmail;
@@ -60,6 +62,7 @@ public class ActivityLogServiceImpl implements ActivityLogService {
     }
 
     @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void logActivity(String action, String entityType, String entityId, String description) {
         logActivity(null, action, entityType, entityId, description);
     }

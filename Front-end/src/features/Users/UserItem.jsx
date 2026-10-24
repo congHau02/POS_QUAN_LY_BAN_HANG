@@ -1,7 +1,10 @@
 import { memo } from "react";
 import { Trash2, User, Edit3 } from "lucide-react";
+import { isSelfAccount } from "./userUtils";
 
-function UserItem({ user, onEdit, onDelete }) {
+function UserItem({ user, onEdit, onDelete, currentUser }) {
+  const isSelf = isSelfAccount(user, currentUser);
+
   return (
     <div className="p-3.5 rounded-xl border border-slate-200 bg-white shadow-xs flex items-center justify-between gap-3 hover:shadow-sm transition-all">
       <div className="flex items-center gap-3">
@@ -37,9 +40,19 @@ function UserItem({ user, onEdit, onDelete }) {
 
         <button
           type="button"
-          className="p-1.5 rounded-lg border border-slate-200 text-slate-500 hover:text-red-600 hover:bg-red-50 transition-colors cursor-pointer"
-          onClick={() => onDelete?.(user)}
-          title="Xóa người dùng"
+          disabled={isSelf}
+          className={`p-1.5 rounded-lg border border-slate-200 transition-colors ${
+            isSelf
+              ? "text-slate-300 bg-slate-50 opacity-40 cursor-not-allowed"
+              : "text-slate-500 hover:text-red-600 hover:bg-red-50 cursor-pointer"
+          }`}
+          onClick={() => {
+            if (!isSelf) {
+              onDelete?.(user);
+            }
+          }}
+          title={isSelf ? "Không thể tự xóa tài khoản đang đăng nhập" : "Xóa người dùng"}
+          aria-label={isSelf ? "Không thể tự xóa tài khoản đang đăng nhập" : "Xóa người dùng"}
         >
           <Trash2 size={16} />
         </button>

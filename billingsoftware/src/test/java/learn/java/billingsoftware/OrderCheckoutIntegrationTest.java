@@ -414,10 +414,10 @@ public class OrderCheckoutIntegrationTest {
         PromotionEntity revertedPromo = promotionRepository.findByPromotionId(testCoupon.getPromotionId()).orElseThrow();
         assertEquals(0, revertedPromo.getTimesUsed());
 
-        // 5. Verify customer metrics rolled back to 0
-        CustomerEntity revertedCustomer = customerRepository.findByCustomerId(testCustomer.getCustomerId()).orElseThrow();
-        assertEquals(0, revertedCustomer.getOrderCount());
-        assertEquals(0.0, revertedCustomer.getTotalSpent(), 0.01);
+        // 5. Verify customer metrics remain unchanged (pending orders do not accrue spending per Ticket 04)
+        CustomerEntity customerAfterCancel = customerRepository.findByCustomerId(testCustomer.getCustomerId()).orElseThrow();
+        assertEquals(1, customerAfterCancel.getOrderCount());
+        assertEquals(88000.0, customerAfterCancel.getTotalSpent(), 0.01);
     }
 
     @Test
@@ -481,5 +481,64 @@ public class OrderCheckoutIntegrationTest {
         mockMvc.perform(post("/orders/" + cancelledOrder.getOrderId() + "/switch-to-cash")
                         .with(user("cashier").roles("USER")))
                 .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    void testCheckoutDirectStockDecrementAndAuditReconciliationEndToEnd() throws Exception {
+        // Initial stock is 10 (from setUp)
+        assertEquals(10, variantRepository.findByVariantId(testVariant.getVariantId()).orElseThrow().getCachedStockQuantity());
+        assertEquals(10, inventoryTransactionRepository.calculateStockByVariantId(testVariant.getVariantId()));
+
+        // 1. POS Checkout 3 units via CASH
+        OrderRequest.OrderItemRequest itemRequest = OrderRequest.OrderItemRequest.builder()
+                .itemId(testItem.getItemId())
+                .variantId(testVariant.getVariantId())
+                .name(testItem.getName())
+                .price(50000.00)
+                .quantity(3)
+                .build();
+
+        OrderRequest orderReq = OrderRequest.builder()
+                .cartItems(List.of(itemRequest))
+                .paymentMethod("CASH")
+                .build();
+
+        mockMvc.perform(post("/orders")
+                        .with(user("cashier").roles("USER"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(orderReq)))
+                .andExpect(status().isCreated());
+
+        // Stock directly decremented by 3: 10 - 3 = 7
+        VariantEntity vAfterOrder = variantRepository.findByVariantId(testVariant.getVariantId()).orElseThrow();
+        assertEquals(7, vAfterOrder.getCachedStockQuantity());
+        assertEquals(7, inventoryTransactionRepository.calculateStockByVariantId(testVariant.getVariantId()));
+
+        // 2. Introduce artificial drift: e.g. cached stock becomes 9 (+2 drift)
+        vAfterOrder.setCachedStockQuantity(9);
+        variantRepository.save(vAfterOrder);
+
+        // 3. Manager performs physical stock check: actual count is 12 units
+        StockCheckRequest stockCheckReq = StockCheckRequest.builder()
+                .variantId(testVariant.getVariantId())
+                .actualCount(12)
+                .referenceId("AUDIT-SYNC-TEST")
+                .note("Physical audit reconciling drift")
+                .build();
+
+        mockMvc.perform(post("/admin/inventory/stock-check")
+                        .with(user("admin").roles("ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(stockCheckReq)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.transactionType", is("ADJUSTMENT")))
+                // True ledger was 7. Actual count is 12. Discrepancy must be 12 - 7 = +5
+                .andExpect(jsonPath("$.quantity", is(5)))
+                .andExpect(jsonPath("$.balanceAfter", is(12)));
+
+        // Both cached stock and true ledger must now be precisely 12
+        VariantEntity vReconciled = variantRepository.findByVariantId(testVariant.getVariantId()).orElseThrow();
+        assertEquals(12, vReconciled.getCachedStockQuantity());
+        assertEquals(12, inventoryTransactionRepository.calculateStockByVariantId(testVariant.getVariantId()));
     }
 }

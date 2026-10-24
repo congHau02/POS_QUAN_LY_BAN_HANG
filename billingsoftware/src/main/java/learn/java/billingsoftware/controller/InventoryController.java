@@ -5,6 +5,10 @@ import learn.java.billingsoftware.io.InventoryTransactionResponse;
 import learn.java.billingsoftware.io.StockCheckRequest;
 import learn.java.billingsoftware.service.InventoryService;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
@@ -29,8 +33,9 @@ public class InventoryController {
     }
 
     @GetMapping("/admin/inventory/transactions")
-    public List<InventoryTransactionResponse> getAllTransactions() {
-        return inventoryService.getAllTransactions();
+    public Page<InventoryTransactionResponse> getAllTransactions(
+            @PageableDefault(page = 0, size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+        return inventoryService.getAllTransactions(pageable);
     }
 
     @GetMapping("/inventory/variants/{variantId}/transactions")

@@ -48,6 +48,7 @@ public class UserUpdateIntegrationTest {
     private final ObjectMapper objectMapper = new ObjectMapper();
 
     @Test
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     @DisplayName("Admin can update user name, email, role and password")
     void testAdminCanUpdateUser() throws Exception {
         String email1 = "user." + UUID.randomUUID().toString().substring(0, 8) + "@billing.com";
@@ -115,6 +116,7 @@ public class UserUpdateIntegrationTest {
     }
 
     @Test
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     @DisplayName("Updating user to already existing email returns 409 Conflict")
     void testEmailConflictReturns409() throws Exception {
         String emailA = "userA." + UUID.randomUUID().toString().substring(0, 8) + "@billing.com";
@@ -139,6 +141,7 @@ public class UserUpdateIntegrationTest {
     }
 
     @Test
+    @Transactional(propagation = org.springframework.transaction.annotation.Propagation.NOT_SUPPORTED)
     @DisplayName("Updating non-existent user returns 404 Not Found")
     void testUpdateNonExistentUserReturns404() throws Exception {
         UserRequest req = UserRequest.builder()
