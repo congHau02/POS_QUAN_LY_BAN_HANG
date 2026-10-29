@@ -1,4 +1,4 @@
--- Flyway Schema Migration V1: Initial Schema
+﻿-- Flyway Schema Migration V1: Initial Schema
 -- Billing Application - POS Management System
 
 CREATE TABLE IF NOT EXISTS `tbl_users` (
@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS `tbl_users` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_user_user_id` (`user_id`),
   UNIQUE KEY `uk_user_email` (`email`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `refresh_tokens` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -27,7 +27,7 @@ CREATE TABLE IF NOT EXISTS `refresh_tokens` (
   UNIQUE KEY `uk_refresh_token_hash` (`token_hash`),
   KEY `idx_refresh_token_family` (`family_id`),
   KEY `idx_refresh_token_user` (`user_email`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `tbl_category` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -41,7 +41,7 @@ CREATE TABLE IF NOT EXISTS `tbl_category` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_category_category_id` (`category_id`),
   UNIQUE KEY `uk_category_name` (`name`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `tbl_items` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -57,7 +57,7 @@ CREATE TABLE IF NOT EXISTS `tbl_items` (
   UNIQUE KEY `uk_item_item_id` (`item_id`),
   KEY `fk_item_category` (`category_id`),
   CONSTRAINT `fk_item_category` FOREIGN KEY (`category_id`) REFERENCES `tbl_category` (`id`) ON DELETE RESTRICT
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `tbl_variants` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -74,7 +74,7 @@ CREATE TABLE IF NOT EXISTS `tbl_variants` (
   UNIQUE KEY `uk_variant_sku` (`sku`),
   KEY `fk_variant_item` (`item_id`),
   CONSTRAINT `fk_variant_item` FOREIGN KEY (`item_id`) REFERENCES `tbl_items` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `tbl_modifier_groups` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -87,7 +87,7 @@ CREATE TABLE IF NOT EXISTS `tbl_modifier_groups` (
   `updated_at` DATETIME(6) NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_modifier_group_group_id` (`group_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `tbl_modifiers` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS `tbl_modifiers` (
   UNIQUE KEY `uk_modifier_modifier_id` (`modifier_id`),
   KEY `fk_modifier_group` (`group_id`),
   CONSTRAINT `fk_modifier_group` FOREIGN KEY (`group_id`) REFERENCES `tbl_modifier_groups` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `tbl_item_modifier_groups` (
   `item_id` BIGINT NOT NULL,
@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS `tbl_item_modifier_groups` (
   KEY `fk_img_group` (`modifier_group_id`),
   CONSTRAINT `fk_img_item` FOREIGN KEY (`item_id`) REFERENCES `tbl_items` (`id`) ON DELETE CASCADE,
   CONSTRAINT `fk_img_group` FOREIGN KEY (`modifier_group_id`) REFERENCES `tbl_modifier_groups` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `tbl_customers` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -125,7 +125,7 @@ CREATE TABLE IF NOT EXISTS `tbl_customers` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_customer_customer_id` (`customer_id`),
   UNIQUE KEY `uk_customer_phone_number` (`phone_number`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `tbl_promotions` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -154,7 +154,7 @@ CREATE TABLE IF NOT EXISTS `tbl_promotions` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_promotion_promotion_id` (`promotion_id`),
   UNIQUE KEY `uk_promotion_code` (`code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `tbl_orders` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -177,7 +177,7 @@ CREATE TABLE IF NOT EXISTS `tbl_orders` (
   `qr_code` TEXT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_order_order_code` (`order_code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `tbl_order_items` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -192,7 +192,7 @@ CREATE TABLE IF NOT EXISTS `tbl_order_items` (
   PRIMARY KEY (`id`),
   KEY `fk_order_item_order` (`order_id`),
   CONSTRAINT `fk_order_item_order` FOREIGN KEY (`order_id`) REFERENCES `tbl_orders` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `tbl_inventory_transactions` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -207,7 +207,7 @@ CREATE TABLE IF NOT EXISTS `tbl_inventory_transactions` (
   UNIQUE KEY `uk_inv_trans_id` (`transaction_id`),
   KEY `fk_inventory_variant` (`variant_id`),
   CONSTRAINT `fk_inventory_variant` FOREIGN KEY (`variant_id`) REFERENCES `tbl_variants` (`id`) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `tbl_activity_logs` (
   `id` BIGINT NOT NULL AUTO_INCREMENT,
@@ -220,4 +220,4 @@ CREATE TABLE IF NOT EXISTS `tbl_activity_logs` (
   `created_at` DATETIME(6) NOT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `uk_activity_log_id` (`log_id`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_0900_ai_ci;
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
