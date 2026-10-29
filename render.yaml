@@ -9,7 +9,7 @@ services:
       - key: PORT
         value: 8080
       - key: DB_HOST
-        value: localhost
+        value: 127.0.0.1
       - key: DB_PORT
         value: 3306
       - key: DB_NAME
@@ -29,16 +29,16 @@ services:
       - key: JWT_SECRET
         generateValue: true
       - key: AWS_ACCESS
-        value: dummy_access
+        sync: false
       - key: AWS_SECRET
-        value: dummy_secret
+        sync: false
       - key: AWS_REGION
         value: us-east-1
       - key: AWS_BUCKET_NAME
-        value: dummy_bucket
+        sync: false
       - key: PAYOS_CLIENT
-        value: dummy_client
+        sync: false
       - key: PAYOS_API
-        value: dummy_api
+        sync: false
       - key: PAYOS_CHECKSUM
-        value: dummy_checksum
+        sync: false
