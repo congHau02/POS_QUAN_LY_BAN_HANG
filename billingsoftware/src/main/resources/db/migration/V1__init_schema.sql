@@ -1,4 +1,4 @@
-﻿-- Flyway Schema Migration V1: Initial Schema
+-- Flyway Schema Migration V1: Initial Schema
 -- Billing Application - POS Management System
 
 CREATE TABLE IF NOT EXISTS `tbl_users` (
