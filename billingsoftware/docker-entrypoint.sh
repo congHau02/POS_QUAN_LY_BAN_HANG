@@ -36,12 +36,17 @@ if [ $COUNT -eq $MAX_TRIES ]; then
 fi
 
 echo "MariaDB is up and healthy! Provisioning database and credentials..."
-mariadb -u root -h 127.0.0.1 -e "
+PASS_ARG=""
+if mariadb-admin -u root -p"${DB_PASS:-123456}" -h 127.0.0.1 ping --silent > /dev/null 2>&1; then
+    PASS_ARG="-p${DB_PASS:-123456}"
+fi
+
+mariadb -u root $PASS_ARG -h 127.0.0.1 -e "
     CREATE DATABASE IF NOT EXISTS billing_app CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
-    CREATE USER IF NOT EXISTS 'root'@'localhost' IDENTIFIED BY '123456';
-    ALTER USER 'root'@'localhost' IDENTIFIED BY '123456';
-    CREATE USER IF NOT EXISTS 'root'@'127.0.0.1' IDENTIFIED BY '123456';
-    ALTER USER 'root'@'127.0.0.1' IDENTIFIED BY '123456';
+    CREATE USER IF NOT EXISTS 'root'@'localhost' IDENTIFIED BY '${DB_PASS:-123456}';
+    ALTER USER 'root'@'localhost' IDENTIFIED BY '${DB_PASS:-123456}';
+    CREATE USER IF NOT EXISTS 'root'@'127.0.0.1' IDENTIFIED BY '${DB_PASS:-123456}';
+    ALTER USER 'root'@'127.0.0.1' IDENTIFIED BY '${DB_PASS:-123456}';
     GRANT ALL PRIVILEGES ON *.* TO 'root'@'localhost' WITH GRANT OPTION;
     GRANT ALL PRIVILEGES ON *.* TO 'root'@'127.0.0.1' WITH GRANT OPTION;
     FLUSH PRIVILEGES;
