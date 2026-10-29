@@ -1,25 +1,37 @@
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import toast from "react-hot-toast";
 import { formatCurrency } from "../../utils/formatCurrency";
 import {
   isModifierGroupMandatory,
   validateModifierSelections,
   getModifierGroupBadgeText,
+  getDefaultModifiersMap,
 } from "../../utils/modifierValidation";
 import { X, Minus, Plus } from "lucide-react";
 
 function POSItemModal({ item, isOpen, onClose, onAddToCart }) {
-  const hasVariants = item?.variants && item.variants.length > 0;
-  const hasModifiers = item?.modifierGroups && item.modifierGroups.length > 0;
+  const hasVariants = Boolean(item?.variants && item.variants.length > 0);
+  const hasModifiers = Boolean(item?.modifierGroups && item.modifierGroups.length > 0);
 
   // Selected variant state (defaults to first variant if available)
   const [selectedVariantId, setSelectedVariantId] = useState(() => {
     return hasVariants ? item.variants[0]?.variantId : null;
   });
 
-  // Selected modifiers state: Map of groupId -> Set of modifierIds
-  const [selectedModifiersMap, setSelectedModifiersMap] = useState({});
+  // Selected modifiers state: Map of groupId -> Set of modifierIds (defaults pre-filled)
+  const [selectedModifiersMap, setSelectedModifiersMap] = useState(() => {
+    return hasModifiers ? getDefaultModifiersMap(item.modifierGroups) : {};
+  });
   const [quantity, setQuantity] = useState(1);
+
+  // Adjust state during render when item changes without cascading effect
+  const [prevItemId, setPrevItemId] = useState(item?.itemId);
+  if (item?.itemId !== prevItemId) {
+    setPrevItemId(item?.itemId);
+    setSelectedVariantId(hasVariants ? item.variants[0]?.variantId : null);
+    setSelectedModifiersMap(hasModifiers ? getDefaultModifiersMap(item.modifierGroups) : {});
+    setQuantity(1);
+  }
 
   // Active selected variant object
   const activeVariant = hasVariants
@@ -57,8 +69,6 @@ function POSItemModal({ item, isOpen, onClose, onAddToCart }) {
   );
   const unitPrice = basePrice + modifiersAdjustment;
   const totalLinePrice = unitPrice * quantity;
-
-  if (!isOpen || !item) return null;
 
   const handleModifierToggle = (group, modifier) => {
     setSelectedModifiersMap((prev) => {
@@ -133,6 +143,40 @@ function POSItemModal({ item, isOpen, onClose, onAddToCart }) {
 
     onClose();
   };
+
+  const handleAddRef = useRef(handleAdd);
+  useEffect(() => {
+    handleAddRef.current = handleAdd;
+  });
+
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  });
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const handleKeyDown = (e) => {
+      if (e.key === "Escape") {
+        e.preventDefault();
+        onCloseRef.current?.();
+      } else if (e.key === "Enter") {
+        const tagName = document.activeElement?.tagName?.toLowerCase();
+        if (tagName !== "input" && tagName !== "textarea") {
+          e.preventDefault();
+          handleAddRef.current?.();
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isOpen]);
+
+  if (!isOpen || !item) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -289,7 +333,7 @@ function POSItemModal({ item, isOpen, onClose, onAddToCart }) {
                           <button
                             key={mod.modifierId}
                             type="button"
-                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
+                            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors cursor-pointer flex items-center gap-1.5 ${
                               isModSelected
                                 ? "bg-blue-600 border-blue-600 text-white shadow-xs"
                                 : "bg-white border-slate-300 text-slate-700 hover:bg-slate-100"
@@ -297,8 +341,19 @@ function POSItemModal({ item, isOpen, onClose, onAddToCart }) {
                             onClick={() => handleModifierToggle(group, mod)}
                           >
                             <span>{mod.name}</span>
+                            {Boolean(mod.isDefault) && (
+                              <span
+                                className={`text-[10px] px-1.5 py-0.2 rounded font-semibold ${
+                                  isModSelected
+                                    ? "bg-blue-500 text-white"
+                                    : "bg-slate-100 text-slate-600 border border-slate-200"
+                                }`}
+                              >
+                                Mặc định
+                              </span>
+                            )}
                             {mod.priceAdjustment > 0 && (
-                              <span className={`ml-1 text-[11px] ${isModSelected ? "text-blue-100" : "text-blue-600"}`}>
+                              <span className={`ml-0.5 text-[11px] ${isModSelected ? "text-blue-100" : "text-blue-600"}`}>
                                 (+{formatCurrency(mod.priceAdjustment)})
                               </span>
                             )}
@@ -357,10 +412,13 @@ function POSItemModal({ item, isOpen, onClose, onAddToCart }) {
         <div className="px-5 py-3.5 border-t border-slate-200 bg-slate-50 flex justify-end gap-2">
           <button
             type="button"
-            className="px-4 py-2 text-xs font-medium text-slate-700 rounded-lg border border-slate-300 hover:bg-white transition-colors cursor-pointer"
+            className="px-4 py-2 text-xs font-medium text-slate-700 rounded-lg border border-slate-300 hover:bg-white transition-colors cursor-pointer flex items-center gap-1.5"
             onClick={onClose}
           >
-            Hủy
+            <span>Hủy</span>
+            <kbd className="hidden sm:inline-block px-1.5 py-0.5 text-[10px] font-mono bg-slate-200/70 text-slate-600 rounded border border-slate-300">
+              Esc
+            </kbd>
           </button>
           <button
             type="button"
@@ -369,6 +427,9 @@ function POSItemModal({ item, isOpen, onClose, onAddToCart }) {
           >
             <Plus size={14} />
             <span>Thêm vào giỏ - {formatCurrency(totalLinePrice)}</span>
+            <kbd className="hidden sm:inline-block ml-1 px-1.5 py-0.5 text-[10px] font-mono bg-blue-700/70 text-blue-100 rounded border border-blue-400/40">
+              ↵ Enter
+            </kbd>
           </button>
         </div>
       </div>

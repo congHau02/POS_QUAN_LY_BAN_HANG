@@ -85,11 +85,16 @@ function ModifierGroupList() {
                   {group.modifiers?.map((mod) => (
                     <span
                       key={mod.modifierId}
-                      className="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-800 border border-blue-100"
+                      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-blue-50 text-blue-800 border border-blue-100"
                     >
-                      {mod.name}
+                      <span>{mod.name}</span>
+                      {Boolean(mod.isDefault) && (
+                        <span className="px-1 py-0.2 rounded text-[10px] font-bold bg-amber-200 text-amber-900 border border-amber-300">
+                          Mặc định
+                        </span>
+                      )}
                       {mod.priceAdjustment > 0 && (
-                        <span className="text-blue-600 font-semibold ml-1">
+                        <span className="text-blue-600 font-semibold ml-0.5">
                           (+{formatCurrency(mod.priceAdjustment)})
                         </span>
                       )}

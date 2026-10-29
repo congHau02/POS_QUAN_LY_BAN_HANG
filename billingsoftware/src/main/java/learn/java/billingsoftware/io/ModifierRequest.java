@@ -14,4 +14,5 @@ import java.math.BigDecimal;
 public class ModifierRequest {
     private String name;
     private BigDecimal priceAdjustment;
+    private Boolean isDefault;
 }

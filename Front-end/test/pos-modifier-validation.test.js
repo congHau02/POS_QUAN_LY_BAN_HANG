@@ -7,6 +7,7 @@ import {
   getExceededModifierGroups,
   validateModifierSelections,
   getModifierGroupBadgeText,
+  getDefaultModifiersMap,
 } from "../src/utils/modifierValidation.js";
 
 test("isModifierGroupMandatory identifies groups requiring at least 1 selection", () => {
@@ -154,4 +155,67 @@ test("getModifierGroupBadgeText formats informative badge text for mandatory and
   assert.equal(getModifierGroupBadgeText({ minSelections: 0 }), null);
   assert.equal(getModifierGroupBadgeText({}), null);
   assert.equal(getModifierGroupBadgeText(null), null);
+});
+
+test("getDefaultModifiersMap correctly extracts default selections from modifier groups", () => {
+  const groups = [
+    {
+      groupId: "g-sugar",
+      name: "Độ ngọt",
+      minSelections: 1,
+      maxSelections: 1,
+      modifiers: [
+        { modifierId: "s-0", name: "0% đường", isDefault: false },
+        { modifierId: "s-50", name: "50% đường", isDefault: false },
+        { modifierId: "s-100", name: "100% đường (chuẩn)", isDefault: true },
+      ],
+    },
+    {
+      groupId: "g-ice",
+      name: "Mức đá",
+      minSelections: 1,
+      maxSelections: 1,
+      modifiers: [
+        { modifierId: "i-0", name: "Không đá", isDefault: false },
+        { modifierId: "i-100", name: "Đá chung (chuẩn)", isDefault: true },
+      ],
+    },
+    {
+      groupId: "g-topping",
+      name: "Topping thêm",
+      minSelections: 0,
+      maxSelections: 3,
+      modifiers: [
+        { modifierId: "t-pearl", name: "Trân châu đen", isDefault: false },
+        { modifierId: "t-pudding", name: "Pudding", isDefault: false },
+      ],
+    },
+  ];
+
+  const defaultMap = getDefaultModifiersMap(groups);
+
+  assert.ok(defaultMap["g-sugar"] instanceof Set);
+  assert.equal(defaultMap["g-sugar"].size, 1);
+  assert.ok(defaultMap["g-sugar"].has("s-100"));
+
+  assert.ok(defaultMap["g-ice"] instanceof Set);
+  assert.equal(defaultMap["g-ice"].size, 1);
+  assert.ok(defaultMap["g-ice"].has("i-100"));
+
+  // Optional group with no defaults should not have empty entries or should have empty Set
+  assert.ok(!defaultMap["g-topping"] || defaultMap["g-topping"].size === 0);
+
+  // Validate that default selections satisfy mandatory validation right away!
+  const validation = validateModifierSelections(groups, defaultMap);
+  assert.equal(validation.isValid, true);
+  assert.equal(validation.errorMessage, null);
+});
+
+test("getDefaultModifiersMap handles null, empty, or missing modifier groups gracefully", () => {
+  assert.deepEqual(getDefaultModifiersMap([]), {});
+  assert.deepEqual(getDefaultModifiersMap(null), {});
+  assert.deepEqual(getDefaultModifiersMap(undefined), {});
+
+  const groupsWithoutModifiers = [{ groupId: "g-empty", modifiers: null }];
+  assert.deepEqual(getDefaultModifiersMap(groupsWithoutModifiers), {});
 });

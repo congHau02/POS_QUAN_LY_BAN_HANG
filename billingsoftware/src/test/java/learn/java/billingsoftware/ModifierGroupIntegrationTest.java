@@ -172,4 +172,49 @@ public class ModifierGroupIntegrationTest {
         mockMvc.perform(get("/modifier-groups/" + groupId).with(user("admin").roles("ADMIN")))
                 .andExpect(status().isNotFound());
     }
+
+    @Test
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void testCreateModifierGroupWithDefaultModifier() throws Exception {
+        ModifierGroupRequest request = ModifierGroupRequest.builder()
+                .name("Sweetness Choice")
+                .description("Sweetness level")
+                .minSelections(1)
+                .maxSelections(1)
+                .modifiers(List.of(
+                        ModifierRequest.builder().name("50% Sugar").priceAdjustment(BigDecimal.ZERO).isDefault(false).build(),
+                        ModifierRequest.builder().name("100% Sugar").priceAdjustment(BigDecimal.ZERO).isDefault(true).build()
+                ))
+                .build();
+
+        mockMvc.perform(post("/admin/modifier-groups")
+                        .with(user("admin").roles("ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.name", is("Sweetness Choice")))
+                .andExpect(jsonPath("$.modifiers[0].isDefault", is(false)))
+                .andExpect(jsonPath("$.modifiers[1].isDefault", is(true)));
+    }
+
+    @Test
+    @WithMockUser(username = "admin", roles = {"ADMIN"})
+    void testCreateModifierGroupExceedingMaxDefaultsThrowsBadRequest() throws Exception {
+        ModifierGroupRequest request = ModifierGroupRequest.builder()
+                .name("Ice Choice Invalid")
+                .description("Exceeding default")
+                .minSelections(1)
+                .maxSelections(1)
+                .modifiers(List.of(
+                        ModifierRequest.builder().name("No Ice").priceAdjustment(BigDecimal.ZERO).isDefault(true).build(),
+                        ModifierRequest.builder().name("Normal Ice").priceAdjustment(BigDecimal.ZERO).isDefault(true).build()
+                ))
+                .build();
+
+        mockMvc.perform(post("/admin/modifier-groups")
+                        .with(user("admin").roles("ADMIN"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isBadRequest());
+    }
 }

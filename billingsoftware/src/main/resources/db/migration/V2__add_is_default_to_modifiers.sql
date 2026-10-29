@@ -1,0 +1,2 @@
+ALTER TABLE `tbl_modifiers`
+ADD COLUMN `is_default` BOOLEAN NOT NULL DEFAULT FALSE;
