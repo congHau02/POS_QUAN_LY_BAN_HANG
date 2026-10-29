@@ -77,6 +77,16 @@ public class SecurityHardeningIntegrationTest {
     }
 
     @Test
+    void testCorsAllowedOriginPatternsAcceptsVercelDomains() throws Exception {
+        mockMvc.perform(options("/categories")
+                        .header("Origin", "https://billing-app-frontend.vercel.app")
+                        .header("Access-Control-Request-Method", "GET"))
+                .andExpect(status().isOk())
+                .andExpect(header().string("Access-Control-Allow-Origin", "https://billing-app-frontend.vercel.app"))
+                .andExpect(header().string("Access-Control-Allow-Credentials", "true"));
+    }
+
+    @Test
     void testAdminSelfDeletionIsPreventedWithHttpBadRequest() throws Exception {
         String adminEmail = "admin." + UUID.randomUUID().toString().substring(0, 8) + "@billing.com";
         UserEntity admin = userRepository.save(UserEntity.builder()

@@ -1,4 +1,6 @@
-# Bước 1: Build ứng dụng với Maven 4 và Java 25
+# ==========================================
+# GIAI ĐOẠN 1: Build JAR với Maven & Java 25
+# ==========================================
 FROM maven:3.9-eclipse-temurin-25-alpine AS build
 WORKDIR /app
 
@@ -11,15 +13,23 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 RUN rm -f target/*-plain.jar
 
-# Bước 2: Chạy ứng dụng (Chỉ sử dụng môi trường JRE Java 25)
+# ==========================================
+# GIAI ĐOẠN 2: Runtime với JRE 25 & MariaDB
+# ==========================================
 FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 
-# Copy file .jar đã được build từ bước trên
-COPY --from=build /app/target/*.jar app.jar
+# Cài đặt MariaDB server, client và công cụ chuyển đổi dòng
+RUN apk add --no-cache mariadb mariadb-client bash dos2unix
 
-# Mở port 8080 (hoặc port bạn dùng trong Spring Boot)
+# Copy file .jar đã build từ bước trên
+COPY --from=build /app/target/*.jar /app/app.jar
+
+# Copy docker-entrypoint script và chuẩn hóa định dạng Unix LF
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN dos2unix /app/docker-entrypoint.sh && chmod +x /app/docker-entrypoint.sh
+
+# Render inject port qua biến môi trường $PORT (mặc định 8080)
 EXPOSE 8080
 
-# Chạy ứng dụng Spring Boot
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["/bin/sh", "/app/docker-entrypoint.sh"]
