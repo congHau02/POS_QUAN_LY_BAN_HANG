@@ -123,6 +123,10 @@ public class DefaultUserAndCatalogIntegrationTest {
                         .with(user("staff@billingapp.com").roles("STAFF")))
                 .andExpect(status().isOk());
 
+        mockMvc.perform(get("/orders")
+                        .with(user("staff@billingapp.com").roles("STAFF")))
+                .andExpect(status().isOk());
+
         // Staff is forbidden on /admin/users
         mockMvc.perform(get("/admin/users")
                         .with(user("staff@billingapp.com").roles("STAFF")))
