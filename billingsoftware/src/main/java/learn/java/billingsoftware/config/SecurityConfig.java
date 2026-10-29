@@ -44,7 +44,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login", "/auth/refresh", "/auth/logout", "/payos/**").permitAll()
-                        .requestMatchers("/categories", "/items/**", "/orders", "/orders/**", "/dashboard", "/modifier-groups/**", "/inventory/**", "/customers", "/customers/**", "/promotions", "/promotions/**", "/activity-logs", "/activity-logs/**").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers("/categories", "/items/**", "/orders", "/orders/**", "/dashboard", "/modifier-groups/**", "/inventory/**", "/customers", "/customers/**", "/promotions", "/promotions/**", "/activity-logs", "/activity-logs/**").hasAnyRole("USER", "ADMIN", "STAFF")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))

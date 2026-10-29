@@ -55,7 +55,7 @@ public class UserServiceImpl implements UserService {
                 .userId(UUID.randomUUID().toString())
                 .email(normalizeEmail(request.getEmail()))
                 .password(passwordEncoder.encode(request.getPassword()))
-                .role(request.getRole().toUpperCase())
+                .role(request.getRole() != null && !request.getRole().trim().toUpperCase().startsWith("ROLE_") ? "ROLE_" + request.getRole().trim().toUpperCase() : (request.getRole() != null ? request.getRole().trim().toUpperCase() : "ROLE_USER"))
                 .name(request.getName())
                 .build();
     }
