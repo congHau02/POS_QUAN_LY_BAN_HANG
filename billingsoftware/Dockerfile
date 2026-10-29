@@ -20,7 +20,9 @@ FROM eclipse-temurin:25-jre-alpine
 WORKDIR /app
 
 # Cài đặt MariaDB server, client và công cụ chuyển đổi dòng
-RUN apk add --no-cache mariadb mariadb-client bash dos2unix
+# Vô hiệu hóa cờ skip-networking mặc định trên Alpine để cho phép lắng nghe cổng TCP 3306
+RUN apk add --no-cache mariadb mariadb-client bash dos2unix && \
+    find /etc/my.cnf* -type f -exec sed -i 's/^skip-networking/#skip-networking/' {} + 2>/dev/null || true
 
 # Copy file .jar đã build từ bước trên
 COPY --from=build /app/target/*.jar /app/app.jar
