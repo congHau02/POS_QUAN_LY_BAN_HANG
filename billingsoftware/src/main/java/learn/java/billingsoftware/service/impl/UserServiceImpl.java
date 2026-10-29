@@ -55,7 +55,7 @@ public class UserServiceImpl implements UserService {
                 .userId(UUID.randomUUID().toString())
                 .email(normalizeEmail(request.getEmail()))
                 .password(passwordEncoder.encode(request.getPassword()))
-                .role(request.getRole().toUpperCase())
+                .role(normalizeRole(request.getRole()))
                 .name(request.getName())
                 .build();
     }
@@ -124,7 +124,7 @@ public class UserServiceImpl implements UserService {
         }
 
         if (request.getRole() != null && !request.getRole().trim().isEmpty()) {
-            String role = request.getRole().trim().toUpperCase();
+            String role = normalizeRole(request.getRole());
             if (!role.startsWith("ROLE_")) {
                 role = "ROLE_" + role;
             }
@@ -142,5 +142,13 @@ public class UserServiceImpl implements UserService {
 
     private String normalizeEmail(String email) {
         return email != null ? email.trim().toLowerCase() : null;
+    }
+
+    private String normalizeRole(String role) {
+        if (role == null || role.trim().isEmpty()) {
+            return "ROLE_USER";
+        }
+        String cleanRole = role.trim().toUpperCase();
+        return cleanRole.startsWith("ROLE_") ? cleanRole : "ROLE_" + cleanRole;
     }
 }

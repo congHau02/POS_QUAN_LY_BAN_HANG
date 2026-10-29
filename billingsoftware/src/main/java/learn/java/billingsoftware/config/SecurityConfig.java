@@ -44,7 +44,7 @@ public class SecurityConfig {
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/login", "/auth/refresh", "/auth/logout", "/payos/**").permitAll()
-                        .requestMatchers("/categories", "/items/**", "/orders", "/orders/**", "/dashboard", "/modifier-groups/**", "/inventory/**", "/customers", "/customers/**", "/promotions", "/promotions/**", "/activity-logs", "/activity-logs/**").hasAnyRole("USER", "ADMIN")
+                        .requestMatchers("/categories", "/items/**", "/orders", "/orders/**", "/dashboard", "/modifier-groups/**", "/inventory/**", "/customers", "/customers/**", "/promotions", "/promotions/**", "/activity-logs", "/activity-logs/**").hasAnyRole("USER", "ADMIN", "STAFF")
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -63,11 +63,17 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
-        List<String> origins = Arrays.stream(allowedOrigins.split(","))
+        List<String> originPatterns = new java.util.ArrayList<>(Arrays.stream(allowedOrigins.split(","))
                 .map(String::trim)
                 .filter(origin -> !origin.isEmpty())
-                .toList();
-        config.setAllowedOrigins(origins);
+                .toList());
+        if (!originPatterns.contains("https://*.vercel.app")) {
+            originPatterns.add("https://*.vercel.app");
+        }
+        if (!originPatterns.contains("http://localhost:*")) {
+            originPatterns.add("http://localhost:*");
+        }
+        config.setAllowedOriginPatterns(originPatterns);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"));
         config.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         config.setAllowCredentials(true);

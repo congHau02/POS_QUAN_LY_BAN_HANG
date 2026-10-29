@@ -1,0 +1,44 @@
+services:
+  - type: web
+    name: billing-backend
+    runtime: docker
+    rootDir: billingsoftware
+    dockerfilePath: Dockerfile
+    plan: free
+    envVars:
+      - key: PORT
+        value: 8080
+      - key: DB_HOST
+        value: localhost
+      - key: DB_PORT
+        value: 3306
+      - key: DB_NAME
+        value: billing_app
+      - key: DB_USER
+        value: root
+      - key: DB_PASS
+        value: 123456
+      - key: AUTH_REFRESH_COOKIE_SECURE
+        value: "true"
+      - key: AUTH_REFRESH_COOKIE_SAME_SITE
+        value: None
+      - key: AUTH_REFRESH_COOKIE_PATH
+        value: /api/v1.0
+      - key: CORS_ALLOWED_ORIGINS
+        value: "https://*.vercel.app,http://localhost:5173"
+      - key: JWT_SECRET
+        generateValue: true
+      - key: AWS_ACCESS
+        value: dummy_access
+      - key: AWS_SECRET
+        value: dummy_secret
+      - key: AWS_REGION
+        value: us-east-1
+      - key: AWS_BUCKET_NAME
+        value: dummy_bucket
+      - key: PAYOS_CLIENT
+        value: dummy_client
+      - key: PAYOS_API
+        value: dummy_api
+      - key: PAYOS_CHECKSUM
+        value: dummy_checksum
