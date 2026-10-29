@@ -121,3 +121,33 @@ export function getModifierGroupBadgeText(group) {
   const min = Number(group.minSelections);
   return `(Bắt buộc - Chọn tối thiểu ${min})`;
 }
+
+/**
+ * Extracts default modifier selections for an item's modifier groups.
+ * Returns a map of groupId -> Set of default modifier IDs.
+ * @param {Array<object>} modifierGroups - List of modifier groups
+ * @returns {Record<string, Set<string>>}
+ */
+export function getDefaultModifiersMap(modifierGroups) {
+  const defaultMap = {};
+  if (!Array.isArray(modifierGroups) || modifierGroups.length === 0) {
+    return defaultMap;
+  }
+
+  for (const group of modifierGroups) {
+    if (!group?.groupId || !Array.isArray(group.modifiers)) {
+      continue;
+    }
+    const defaultIds = new Set();
+    for (const mod of group.modifiers) {
+      if (mod?.modifierId && Boolean(mod.isDefault)) {
+        defaultIds.add(mod.modifierId);
+      }
+    }
+    if (defaultIds.size > 0) {
+      defaultMap[group.groupId] = defaultIds;
+    }
+  }
+
+  return defaultMap;
+}

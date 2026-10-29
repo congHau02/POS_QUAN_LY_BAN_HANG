@@ -56,6 +56,8 @@ public class ModifierGroupServiceImpl implements ModifierGroupService {
             }
         }
 
+        validateModifierGroup(groupEntity);
+
         ModifierGroupEntity saved = modifierGroupRepository.save(groupEntity);
         activityLogService.logActivity("CREATE", "MODIFIER_GROUP", saved.getGroupId(), "Created modifier group: " + saved.getName());
         return convertToResponse(saved);
@@ -105,9 +107,21 @@ public class ModifierGroupServiceImpl implements ModifierGroupService {
             }
         }
 
+        validateModifierGroup(entity);
+
         ModifierGroupEntity saved = modifierGroupRepository.save(entity);
         activityLogService.logActivity("UPDATE", "MODIFIER_GROUP", saved.getGroupId(), "Updated modifier group: " + saved.getName());
         return convertToResponse(saved);
+    }
+
+    private void validateModifierGroup(ModifierGroupEntity entity) {
+        long defaultCount = entity.getModifiers().stream()
+                .filter(m -> Boolean.TRUE.equals(m.getIsDefault()))
+                .count();
+        if (entity.getMaxSelections() != null && entity.getMaxSelections() > 0 && defaultCount > entity.getMaxSelections()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Số lượng tùy chọn mặc định (" + defaultCount + ") vượt quá số lượng tối đa cho phép (" + entity.getMaxSelections() + ")");
+        }
     }
 
     private ModifierEntity buildModifierEntity(ModifierRequest modReq, ModifierGroupEntity parent) {
@@ -118,6 +132,7 @@ public class ModifierGroupServiceImpl implements ModifierGroupService {
                 .modifierId(UUID.randomUUID().toString())
                 .name(modReq.getName().trim())
                 .priceAdjustment(modReq.getPriceAdjustment() != null ? modReq.getPriceAdjustment() : BigDecimal.ZERO)
+                .isDefault(Boolean.TRUE.equals(modReq.getIsDefault()))
                 .modifierGroup(parent)
                 .build();
     }
@@ -174,6 +189,7 @@ public class ModifierGroupServiceImpl implements ModifierGroupService {
                         .modifierId(m.getModifierId())
                         .name(m.getName())
                         .priceAdjustment(m.getPriceAdjustment())
+                        .isDefault(Boolean.TRUE.equals(m.getIsDefault()))
                         .build())
                 .collect(Collectors.toList())
                 : new ArrayList<>();

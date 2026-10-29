@@ -15,4 +15,5 @@ public class ModifierResponse {
     private String modifierId;
     private String name;
     private BigDecimal priceAdjustment;
+    private Boolean isDefault;
 }

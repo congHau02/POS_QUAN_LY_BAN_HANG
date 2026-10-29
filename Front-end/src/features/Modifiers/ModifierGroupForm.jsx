@@ -1,4 +1,4 @@
-import { useForm, useFieldArray } from "react-hook-form";
+import { useForm, useFieldArray, useWatch } from "react-hook-form";
 import toast from "react-hot-toast";
 import { useCreateModifierGroup } from "./useCreateModifierGroup";
 import Spinner from "../../ui/Spinner";
@@ -11,6 +11,8 @@ function ModifierGroupForm() {
     control,
     handleSubmit,
     reset,
+    setValue,
+    getValues,
     formState: { errors },
   } = useForm({
     defaultValues: {
@@ -18,7 +20,7 @@ function ModifierGroupForm() {
       description: "",
       minSelections: 0,
       maxSelections: 1,
-      modifiers: [{ name: "", priceAdjustment: 0 }],
+      modifiers: [{ name: "", priceAdjustment: 0, isDefault: true }],
     },
   });
 
@@ -27,12 +29,49 @@ function ModifierGroupForm() {
     name: "modifiers",
   });
 
+  const watchedMaxSelections = useWatch({
+    control,
+    name: "maxSelections",
+    defaultValue: 1,
+  });
+  const maxSel = parseInt(watchedMaxSelections, 10) || 1;
+  const isSingle = maxSel === 1;
+  const currentModifiers = useWatch({
+    control,
+    name: "modifiers",
+  }) || [];
+
+  const handleToggleDefault = (idx) => {
+    const mods = getValues("modifiers") || [];
+    if (isSingle) {
+      const isAlreadyDefault = Boolean(mods[idx]?.isDefault);
+      mods.forEach((m, i) => {
+        setValue(`modifiers.${i}.isDefault`, i === idx ? !isAlreadyDefault : false, {
+          shouldValidate: true,
+          shouldDirty: true,
+        });
+      });
+    } else {
+      const currentDefaultCount = mods.filter((m, i) => i !== idx && Boolean(m.isDefault)).length;
+      const willBeChecked = !mods[idx]?.isDefault;
+      if (willBeChecked && currentDefaultCount >= maxSel) {
+        toast.error(`Chỉ được chọn tối đa ${maxSel} tùy chọn mặc định`);
+        return;
+      }
+      setValue(`modifiers.${idx}.isDefault`, willBeChecked, {
+        shouldValidate: true,
+        shouldDirty: true,
+      });
+    }
+  };
+
   const onSubmit = (data) => {
     const validModifiers = (data.modifiers || [])
       .filter((m) => m.name && m.name.trim() !== "")
       .map((m) => ({
         name: m.name.trim(),
         priceAdjustment: parseFloat(m.priceAdjustment) || 0,
+        isDefault: Boolean(m.isDefault),
       }));
 
     if (validModifiers.length === 0) {
@@ -55,7 +94,7 @@ function ModifierGroupForm() {
           description: "",
           minSelections: 0,
           maxSelections: 1,
-          modifiers: [{ name: "", priceAdjustment: 0 }],
+          modifiers: [{ name: "", priceAdjustment: 0, isDefault: true }],
         });
       },
     });
@@ -168,7 +207,7 @@ function ModifierGroupForm() {
             </label>
             <button
               type="button"
-              onClick={() => append({ name: "", priceAdjustment: 0 })}
+              onClick={() => append({ name: "", priceAdjustment: 0, isDefault: false })}
               disabled={isCreating}
               className="inline-flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 font-medium cursor-pointer"
             >
@@ -221,6 +260,32 @@ function ModifierGroupForm() {
                       </p>
                     )}
                   </div>
+                  <button
+                    type="button"
+                    onClick={() => handleToggleDefault(index)}
+                    disabled={isCreating}
+                    className={`px-2.5 py-1.5 rounded-lg text-xs font-medium border flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+                      currentModifiers[index]?.isDefault
+                        ? "bg-amber-50 border-amber-300 text-amber-900 font-bold shadow-2xs"
+                        : "bg-slate-50 border-slate-200 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                    }`}
+                    title={
+                      isSingle
+                        ? "Chọn làm tùy chọn mặc định duy nhất (chọn 1)"
+                        : "Chọn làm tùy chọn mặc định (chọn nhiều)"
+                    }
+                  >
+                    <span
+                      className={`w-3.5 h-3.5 rounded-full border flex items-center justify-center text-[9px] ${
+                        currentModifiers[index]?.isDefault
+                          ? "border-amber-600 bg-amber-500 text-white"
+                          : "border-slate-300 bg-white"
+                      }`}
+                    >
+                      {currentModifiers[index]?.isDefault ? "✓" : ""}
+                    </span>
+                    <span>Mặc định</span>
+                  </button>
                   <button
                     type="button"
                     onClick={() => {
