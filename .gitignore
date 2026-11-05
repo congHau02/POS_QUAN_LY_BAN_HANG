@@ -14,6 +14,7 @@ dist/
 *.log
 
 # AI Agents & Temporary Files
+.archify/
 .agents/
 .claude/
 skills/
